@@ -8134,6 +8134,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
   }
 
   function saveHistory() {
+    if (aipUI) aipDrawBehindHook();
     const snap = snapshot();
     if (state.history[state.historyIndex] === snap) return;
     state.history = state.history.slice(0, state.historyIndex + 1);
@@ -20309,7 +20310,7 @@ function dsSetNodeMode(o,index,mode){
   const aipSvg=body=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
   const aipIcon=(name)=>aipSvg(AIP_ICONS[name]||'');
   toolCursors.eyedropper=cursorIcon('M3 29 5 23 17 11 21 15 9 27Z M15 9 23 17 M19 13 25 7a3 3 0 0 0-4-4l-6 6',3,29,'crosshair');
-  const aipStore={load(){try{return JSON.parse(localStorage.getItem(AIP_STORE)||'{}')||{};}catch(_){return {};}},save(){try{localStorage.setItem(AIP_STORE,JSON.stringify({ref:aipUI.ref,link:aipUI.link,alignTo:aipUI.alignTo,collapsed:aipUI.collapsed,opts:aipUI.opts}));}catch(_){}}};
+  const aipStore={load(){try{return JSON.parse(localStorage.getItem(AIP_STORE)||'{}')||{};}catch(_){return {};}},save(){try{localStorage.setItem(AIP_STORE,JSON.stringify({ref:aipUI.ref,link:aipUI.link,alignTo:aipUI.alignTo,collapsed:aipUI.collapsed,opts:aipUI.opts,taskBar:aipUI.taskBar}));}catch(_){}}};
 
   function aipEditable(){return selectedObjects().filter(o=>!o.locked);}
   function aipCommit(){saveHistory();render();renderLayers();syncControls();}
@@ -20411,10 +20412,11 @@ function dsSetNodeMode(o,index,mode){
     document.querySelectorAll('[data-aip-tool]').forEach(b=>{const on=b.dataset.aipTool===aipUI.tool;b.classList.toggle('ai-on',on);b.classList.toggle('is-active',on);b.setAttribute('aria-pressed',String(on));});
     if(tool&&AIP_TOOL_HELP[tool])setStatus(AIP_TOOL_HELP[tool],7000);
     if(tool!=='measure')aipUI.measure=null;
+    aipUI.blendFirst=null;
     updateCursor();aipSync();aipDrawOverlay();
   }
   function aipToolCleared(){if(aipUI?.tool&&!aipUI.switching)aipSetTool(null);}
-  function aipCursor(){const t=aipUI.tool;return t==='zoom'?(aipUI.alt?'zoom-out':'zoom-in'):t==='eyedropper'?toolCursors.eyedropper:t==='rotate'?toolCursors.rotate:t==='scale'?'nwse-resize':t==='carrier'?'cell':'crosshair';}
+  function aipCursor(){const t=aipUI.tool;return t==='zoom'?(aipUI.alt?'zoom-out':'zoom-in'):t==='eyedropper'?toolCursors.eyedropper:t==='rotate'?toolCursors.rotate:t==='scale'?'nwse-resize':t==='carrier'?'cell':t==='wand'||t==='lasso'?'default':'crosshair';}
 
   function aipInstallInput(){
     window.addEventListener('pointerdown',e=>{
@@ -20611,10 +20613,11 @@ function dsSetNodeMode(o,index,mode){
     const toolOpts=$('aipToolOptionsBody'),pen=!aipUI.tool&&!n&&state.tool==='bezier'&&!!toolOpts?.children.length,extra=$('aipToolOptsExtra');
     if(extra&&extra.dataset.tool!==(aipUI.tool||'')){extra.dataset.tool=aipUI.tool||'';extra.innerHTML=aipUI.tool?aipToolOptionsHtml():'';aipBindToolOptions(extra);}
     show('aipToolOptions',pen||!!aipUI.tool);toolOpts.hidden=!pen;
-    $('aipToolOptions').querySelector('.aip-sec-head span').textContent=aipUI.tool?(({eyedropper:'Eyedropper',zoom:'Zoom',rotate:'Rotate',scale:'Scale',measure:'Measure',carrier:'Carrier',level:'Energy Level',dimension:'Dimension'})[aipUI.tool]+' Tool'):'Pen Tool';
+    $('aipToolOptions').querySelector('.aip-sec-head span').textContent=aipUI.tool?(({eyedropper:'Eyedropper',zoom:'Zoom',rotate:'Rotate',scale:'Scale',measure:'Measure',carrier:'Carrier',level:'Energy Level',dimension:'Dimension',wand:'Magic Wand',lasso:'Lasso',reflect:'Reflect',shapebuilder:'Shape Builder',blend:'Blend',graph:'Graph',artboard:'Artboard'})[aipUI.tool]+' Tool'):(aipUI.preset==='curvature'?'Curvature Tool':'Pen Tool');
     $('aipToolHint').textContent=pen?'Click to place corner points, drag to pull out smooth handles. Enter finishes; Esc cancels.':aipUI.tool?AIP_TOOL_HELP[aipUI.tool].replace(/^[^:]+:\s*(.)/,(m,c)=>c.toUpperCase()):'';
     const pivotKey=state.selectedIds.join(',');if(pivotKey!==aipUI.pivotKey){aipUI.pivotKey=pivotKey;aipUI.pivot=null;}
     if(aipUI.tool)aipDrawOverlay();
+    aipSyncPresets();aipPlaceTaskBar();
     show('aipTransform',n>0);show('aipAppearance',n>0);show('aipAlign',n>0);
     show('aipCharacter',textObjs.length>0||(!n&&!!teArmedKind));
     show('aipImage',single?.type==='image');
@@ -20666,11 +20669,16 @@ function dsSetNodeMode(o,index,mode){
 
   function aipAddToolButtons(){
     const tools=document.querySelector('#dsTools .ds-tools');if(!tools)return;
-    for(const [tool,title] of [['eyedropper','Eyedropper Tool (I)'],['zoom','Zoom Tool (Z)'],['rotate','Rotate Tool (Shift+R)'],['scale','Scale Tool (S)'],['measure','Measure Tool (Shift+M)'],['carrier','Carrier Tool (Shift+C)'],['level','Energy Level Tool (Shift+L)'],['dimension','Dimension Tool (Shift+D)']]){
+    for(const [tool,title] of [['eyedropper','Eyedropper Tool (I)'],['zoom','Zoom Tool (Z)'],['rotate','Rotate Tool (Shift+R)'],['scale','Scale Tool (S)'],['measure','Measure Tool (Shift+M)'],['carrier','Carrier Tool (Shift+C)'],['level','Energy Level Tool (Shift+L)'],['dimension','Dimension Tool (Shift+D)'],['wand','Magic Wand Tool (Y)'],['lasso','Lasso Tool'],['reflect','Reflect Tool'],['shapebuilder','Shape Builder Tool (Shift+M)'],['blend','Blend Tool (W)'],['graph','Graph Tool (J)'],['artboard','Artboard Tool (Shift+O)']]){
       const b=document.createElement('button');b.type='button';b.dataset.aipTool=tool;b.title=title;b.setAttribute('aria-label',title);b.setAttribute('aria-pressed','false');b.innerHTML=aipIcon(tool);
       b.addEventListener('click',()=>aipSetTool(aipUI.tool===tool&&tool!=='zoom'?null:tool));
       if(tool==='zoom')b.addEventListener('dblclick',()=>{setZoom(1);aipSetTool(null);setStatus('Zoom 100%.');});
+      if(tool==='hand')continue;
       tools.append(b);
+    }
+    for(const [key,title] of [['pen','Pen Tool (B)'],['curvature','Curvature Tool'],['paintbrush','Paintbrush Tool'],['pencil','Pencil Tool (N)'],['shaper','Shaper Tool']]){
+      const b=document.createElement('button');b.type='button';b.dataset.aipPreset=key;b.title=title;b.setAttribute('aria-label',title);b.setAttribute('aria-pressed','false');
+      b.addEventListener('click',()=>aipUsePreset(key));tools.append(b);
     }
   }
 
@@ -20723,6 +20731,8 @@ function dsSetNodeMode(o,index,mode){
     const m=aipUI.measure;
     if(m&&aipUI.tool==='measure'){const r=3.5*k;parts.push(`<g class="aip-ov-measure"><path d="M${m.a.x} ${m.a.y}L${m.b.x} ${m.b.y}"/><circle cx="${m.a.x}" cy="${m.a.y}" r="${r}"/><circle cx="${m.b.x}" cy="${m.b.y}" r="${r}"/><text x="${(m.a.x+m.b.x)/2+8*k}" y="${(m.a.y+m.b.y)/2-8*k}" style="font-size:${12*k}px">${escapeHtmlAttr(aipFormatLen(Math.hypot(m.b.x-m.a.x,m.b.y-m.a.y)))}</text></g>`);}
     const d=aipUI.drag;
+    if(d?.points&&d.moved&&(d.tool==='lasso'||d.tool==='shapebuilder'))parts.push(`<path class="${d.tool==='lasso'?'aip-ov-lasso':'aip-ov-builder'}" d="M${d.points.map(q=>`${q.x} ${q.y}`).join('L')}${d.tool==='lasso'?'Z':''}"/>`);
+    if(d?.rect&&d.moved)parts.push(`<rect class="aip-ov-rect" x="${d.rect.x}" y="${d.rect.y}" width="${d.rect.w}" height="${d.rect.h}"/>`);
     if(d?.preview)parts.push(`<path class="aip-ov-preview" d="M${d.preview.a.x} ${d.preview.a.y}L${d.preview.b.x} ${d.preview.b.y}"/>`);
     svg.innerHTML=parts.join('');svg.style.setProperty('--k',k);
   }
@@ -20789,11 +20799,12 @@ function dsSetNodeMode(o,index,mode){
 
   function aipToolDown(e){
     const t=aipUI.tool,p=pointFromEvent(e);
+    if(aipDownExtra(e,p))return;
     if(['rotate','scale'].includes(t)){
       if(!aipEditable().length){setStatus(`Select objects before using the ${t==='rotate'?'Rotate':'Scale'} tool.`);return;}
       if(e.altKey){aipUI.pivot=p;aipDrawOverlay();aipTransformDialog(t);return;}
     }
-    aipUI.drag={tool:t,id:e.pointerId,start:p,last:p,moved:false,alt:e.altKey,created:[],preview:null};
+    aipUI.drag={tool:t,id:e.pointerId,start:p,last:p,moved:false,alt:e.altKey,shift:e.shiftKey,created:[],preview:null,points:[p]};
     if(t==='carrier')aipPlaceCarrier(aipUI.drag,p);
     try{canvas.setPointerCapture(e.pointerId);}catch(_){}
   }
@@ -20806,6 +20817,8 @@ function dsSetNodeMode(o,index,mode){
     if(['rotate','scale'].includes(d.tool))aipTransformFromStarts(d,p,e.shiftKey);
     else if(d.tool==='measure'){aipUI.measure={a:d.start,b:p};aipMeasureReadout();}
     else if(d.tool==='carrier'){const s=clamp(aipNum(aipUI.opts.carrierSize,14),6,60);if(Math.hypot(p.x-d.lastPlaced.x,p.y-d.lastPlaced.y)>=s*1.6)aipPlaceCarrier(d,p);}
+    else if(d.tool==='lasso'||d.tool==='shapebuilder')d.points.push(raw);
+    else if(d.tool==='graph'||d.tool==='artboard')d.rect=aipRect(d.start,raw,d.tool==='graph'&&e.shiftKey);
     else if(['level','dimension'].includes(d.tool)){d.preview={a:d.start,b:p};if(d.tool==='dimension')setStatus(`Dimension ${aipFormatLen(Math.hypot(p.x-d.start.x,p.y-d.start.y))}`,1200);}
     aipDrawOverlay();return true;
   }
@@ -20817,6 +20830,10 @@ function dsSetNodeMode(o,index,mode){
       else{aipUI.pivot=d.start;setStatus('Origin point set. Drag to '+(d.tool==='rotate'?'rotate':'scale')+' around it.');}
     }else if(d.tool==='carrier'){if(d.created.length){saveHistory();renderLayers();syncControls();}}
     else if(d.tool==='level'){const ids=aipCreateLevel(d.start,d.moved?d.last:d.start);state.selectedIds=ids;saveHistory();render();renderLayers();syncControls();}
+    else if(d.tool==='lasso'){if(d.moved)aipLassoSelect(d.points,{shiftKey:d.shift,altKey:d.alt});else if(!d.shift&&!d.alt)aipSelect([]);}
+    else if(d.tool==='shapebuilder')aipShapeBuild(d.points,d.alt);
+    else if(d.tool==='graph')aipInsertGraph(d.moved&&d.rect&&d.rect.w>10?d.rect:{x:d.start.x,y:d.start.y,w:300,h:200});
+    else if(d.tool==='artboard'){if(d.moved&&d.rect)aipCropArtboard(d.rect);else $('resizeCanvasBtn')?.click();}
     else if(d.tool==='dimension'&&d.moved){const ids=aipCreateDimension(d.start,d.last);if(ids.length){state.selectedIds=ids;saveHistory();render();renderLayers();syncControls();}}
     aipDrawOverlay();return true;
   }
@@ -20949,6 +20966,7 @@ function dsSetNodeMode(o,index,mode){
         {l:'Hide Selection',k:'Ctrl+3',f:()=>aipHide(true),d:!sel},{l:'Show All',k:'Alt+Ctrl+3',f:()=>aipHide(false),d:!state.objects.some(o=>o.visible===false)},'-',
         {l:'Path',sub:[{l:'Edit Anchor Points',f:()=>dsSetMode('nodes'),d:!(single&&['line','bezier','path'].includes(single.type))},{l:'Pen Tool',k:'B',f:()=>dsSetMode('pen')}]},
         {l:'Shape Merge (Pathfinder)',sub:[['union','Unite'],['subtract','Minus Front'],['intersect','Intersect'],['combine','Exclude'],['release','Release']].map(([m,l])=>({l,f:()=>mergeSelectedShapes(m),d:m==='release'?!sel:n<2}))},
+        {l:'Blend',sub:[{l:'Make',k:'Alt+Ctrl+B',f:()=>{const s2=selectedObjects();aipMakeBlend(s2[0],s2[1]);},d:n!==2},{l:'Blend Tool',k:'W',f:()=>aipSetTool('blend')}]},
         {l:'Image',sub:[{l:'Edit with AI…',f:click('editAiImageBtn'),d:single?.type!=='image'},{l:'Image Trace (Convert to Vector)',f:click('vectorizeImageBtn'),d:single?.type!=='image'}]},'-',
         {l:'Artboards',sub:[{l:'Fit to Artwork Bounds',f:()=>aipFitArtboard(false)},{l:'Fit to Selected Art',f:()=>aipFitArtboard(true),d:!sel},{l:'Artboard Size…',f:click('resizeCanvasBtn')},{l:'Journal Setup…',f:click('journalSetupBtn')}]}
       ],
@@ -20995,14 +21013,16 @@ function dsSetNodeMode(o,index,mode){
         {l:'Tools',f:()=>{const t=$('dsTools');if(t)t.hidden=!t.hidden;},c:!$('dsTools')?.hidden},
         {l:'Dock Tools Panel',f:()=>window.EECanvasDockTools?.(),c:!!window.EECanvasToolsDocked?.(),d:!!$('dsTools')?.hidden},
         {l:'Rulers & Guides',f:click('dsGuideOpen'),c:!$('dsGuides')?.hidden},{l:'Drawing Styles',f:click('dsStyleOpen'),c:!$('dsStyles')?.hidden},
-        {l:'Template Library',k:'K',f:()=>openTemplateLibrary()}
+        {l:'Template Library',k:'K',f:()=>openTemplateLibrary()},'-',
+        {l:'Contextual Task Bar',f:()=>{aipUI.taskBar=!aipUI.taskBar;aipStore.save();aipPlaceTaskBar();},c:!!aipUI.taskBar},
+        {l:'Full Screen Mode',k:'F',f:()=>window.EECanvasScreenMode?.(),c:!!document.fullscreenElement}
       ],
       'Solid State':[
         {l:'Band Diagram…',f:()=>buildBandDiagram()},{l:'Layer Stack…',f:()=>buildLayerStack()},{l:'Curve / Plot…',f:()=>buildCurve()},
         {l:'AI Visual Creator…',f:()=>openAICreator('auto')},{l:'Template Library…',k:'K',f:()=>openTemplateLibrary()},'-',
         ...STENCILS.map(sec=>({l:sec.g,sub:sec.items.map(([label,make])=>({l:label.replace(/\\([A-Za-z]+)/g,(t,w)=>SCI_SYMBOLS[w]||t),f:()=>placeGroup(make(),label)}))})),'-',
         {l:'Apply Material',sub:Object.keys(MAT).map(k=>({l:AIP_MAT_NAMES[k]||k,sw:MAT[k].fill,f:()=>aipApplyMaterial(k),d:!shapes}))},'-',
-        tool('carrier','Carrier Tool','Shift+C'),tool('level','Energy Level Tool','Shift+L'),tool('dimension','Dimension Tool','Shift+D'),tool('measure','Measure Tool','Shift+M'),'-',
+        tool('carrier','Carrier Tool','Shift+C'),tool('level','Energy Level Tool','Shift+L'),tool('dimension','Dimension Tool','Shift+D'),tool('measure','Measure Tool',''),tool('graph','Graph Tool','J'),'-',
         {l:'Drawing Scale…',f:aipScaleDialog},{l:'Insert Scale Bar',f:aipInsertScaleBar}
       ],
       Help:[
@@ -21071,12 +21091,13 @@ function dsSetNodeMode(o,index,mode){
   function aipHandleKey(e){
     const mod=e.ctrlKey||e.metaKey,key=String(e.key||'').toLowerCase(),code=String(e.code||'');
     if(aim.top&&key==='escape'){aimClose();return true;}
-    const run=fn=>{e.preventDefault();fn();return true;};
+    const run=fn=>{e.preventDefault();e.stopPropagation();fn();return true;};
     if(mod){
       if(key==='x')return run(aipCut);
       if(key==='a')return run(()=>e.shiftKey?aipSelect([]):aipSelect(aipVisible().filter(o=>!o.locked).map(o=>o.id)));
       if(key==='v'&&e.shiftKey)return run(()=>aipPaste('place'));
       if(key==='f'&&!e.shiftKey)return run(()=>aipPaste('front'));
+      if(key==='b'&&e.altKey){const s2=selectedObjects();return run(()=>s2.length===2?aipMakeBlend(s2[0],s2[1]):setStatus('Select exactly two objects to blend.'));}
       if(key==='b'&&!e.shiftKey)return run(()=>aipPaste('back'));
       if(key==='m'&&e.shiftKey)return run(()=>aipTransformDialog('move'));
       if(code==='BracketRight'||code==='BracketLeft'){const up=code==='BracketRight';return run(()=>e.altKey?aipSelectStep(up?1:-1):$(up?(e.shiftKey?'frontBtn':'upBtn'):(e.shiftKey?'backBtn':'downBtn'))?.click());}
@@ -21093,13 +21114,17 @@ function dsSetNodeMode(o,index,mode){
     }
     if(e.altKey)return false;
     if(e.shiftKey){
-      const t={r:'rotate',m:'measure',c:'carrier',l:'level',d:'dimension'}[key];
+      const t={r:'rotate',m:'shapebuilder',c:'carrier',l:'level',d:'dimension',o:'artboard'}[key];
       if(t)return run(()=>aipSetTool(t));
+      const pre={b:'paintbrush',n:'shaper'}[key]||(code==='Backquote'?'curvature':null);
+      if(pre)return run(()=>aipUsePreset(pre));
       if(key==='x'||key==='/')return false;
       return false;
     }
-    const t={z:'zoom',i:'eyedropper',s:'scale'}[key];
+    const t={z:'zoom',i:'eyedropper',s:'scale',y:'wand',w:'blend',j:'graph'}[key];
     if(t)return run(()=>aipSetTool(t));
+    if(key==='n')return run(()=>aipUsePreset('pencil'));
+    if(key==='f')return run(()=>window.EECanvasScreenMode?.());
     return false;
   }
 
@@ -21113,6 +21138,8 @@ function dsSetNodeMode(o,index,mode){
     if(t==='level')return `<div class="aip-grid"><span class="aip-lab">Level</span><div class="aip-ctl">${sel('aipOptLevel',o.level,[['Ec','Conduction band E_c'],['Ev','Valence band E_v'],['EF','Fermi level E_F'],['Ei','Intrinsic level E_i'],['Evac','Vacuum level E_vac'],['EFn','Quasi-Fermi E_Fn'],['EFp','Quasi-Fermi E_Fp'],['custom','Custom…']])}</div>
       <span class="aip-lab">Label</span><div class="aip-ctl"><input id="aipOptLevelLabelOn" type="checkbox"${o.levelLabelOn?' checked':''} aria-label="Add label"><input id="aipOptLevelLabel" type="text" placeholder="e.g. E_t" value="${escapeHtmlAttr(o.levelLabel)}"${o.level==='custom'?'':' disabled'}></div></div>`;
     if(t==='dimension'||t==='measure'){const s=aipScale();return `<div class="aip-row"><span class="aip-lab">Scale</span><span>${s.px} px = ${s.value} ${s.unit}</span><button type="button" class="aip-link-btn" id="aipOptScale">Change…</button></div>`+(t==='dimension'?`<div class="aip-row"><label class="aip-f"><span>Decimals:</span>${sel('aipOptDecimals',String(o.dimDecimals),[['0','0'],['1','1'],['2','2'],['3','3']])}</label></div>`:`<p class="aip-note aip-readout" id="aipMeasureOut">Drag on the canvas to measure.</p>`);}
+    if(t==='blend')return `<div class="aip-row"><label class="aip-f"><span>Specified Steps:</span><input id="aipOptBlendSteps" type="number" min="1" max="50" step="1" value="${o.blendSteps}"></label></div>`;
+    if(t==='graph')return `<div class="aip-row"><label class="aip-f aip-grow"><span>Type:</span>${sel('aipOptGraph',o.graph,Object.entries(AIP_GRAPHS).map(([k,[l]])=>[k,l]))}</label></div>`;
     if(t==='rotate'||t==='scale')return `<div class="aip-row aip-actions"><button type="button" id="aipOptDialog">${t==='rotate'?'Rotate…':'Scale…'}</button><button type="button" id="aipOptResetPivot">Reset Origin</button></div>`;
     return '';
   }
@@ -21125,8 +21152,202 @@ function dsSetNodeMode(o,index,mode){
     on('aipOptLevelLabelOn','change',e=>{o.levelLabelOn=e.target.checked;save();});on('aipOptLevelLabel','change',e=>{o.levelLabel=e.target.value.slice(0,24);save();});
     on('aipOptDecimals','change',e=>{o.dimDecimals=Number(e.target.value);save();});
     on('aipOptScale','click',aipScaleDialog);
+    on('aipOptBlendSteps','change',e=>{o.blendSteps=clamp(Math.round(aipNum(e.target.value,5)),1,50);e.target.value=o.blendSteps;save();});
+    on('aipOptGraph','change',e=>{o.graph=e.target.value;save();});
     on('aipOptDialog','click',()=>aipTransformDialog(aipUI.tool));
     on('aipOptResetPivot','click',()=>{aipUI.pivot=null;aipDrawOverlay();});
+  }
+
+  // ===== 8. Illustrator Advanced-toolbar tools, task bar, and draw modes =====
+  Object.assign(AIP_TOOL_HELP,{
+    wand:'Magic Wand: click an object to select everything with the same fill (or stroke, for unfilled paths). Shift-click adds; Alt-click removes.',
+    lasso:'Lasso: drag a freeform loop around objects to select them. Shift adds to the selection; Alt removes.',
+    reflect:'Reflect: click to mirror the selection across a vertical axis through that point; Alt-click mirrors across a horizontal axis.',
+    shapebuilder:'Shape Builder: drag across overlapping shapes to unite them. Alt-drag subtracts the front shapes from the back one; Alt-click a single shape deletes it.',
+    blend:'Blend: click the first object, then the second, to create intermediate steps that morph position, size, rotation, and color. Set the number of steps in Tool Options.',
+    graph:'Graph: drag a rectangle to insert axes or a solid-state plot at that size (Shift makes it square). Choose the graph type in Tool Options.',
+    artboard:'Artboard: drag a rectangle to crop the artboard to it; click to set an exact artboard size.'
+  });
+  Object.assign(aipUI.opts,{blendSteps:5,graph:'axes'});
+  aipUI.blendFirst=null;aipUI.preset=null;aipUI.drawMode='normal';aipUI.knownIds=null;aipUI.taskBar=true;
+
+  // Drawing-tool presets share the app's Pen and Freehand engines.
+  const AIP_PRESETS={
+    pen:{base:'pen',curve:'pen'},curvature:{base:'pen',curve:'bend'},
+    paintbrush:{base:'draw',ink:'smooth',strength:'strong',pressure:true},
+    pencil:{base:'draw',ink:'smooth',strength:'medium',pressure:false},
+    shaper:{base:'draw',ink:'shape',strength:'strong',pressure:false}
+  };
+  const AIP_PRESET_HELP={
+    curvature:'Curvature: drag between two endpoints, then bend the curve into shape. Choose another curve method in Tool Options.',
+    paintbrush:'Paintbrush: draw smooth, pressure-sensitive brush strokes.',
+    pencil:'Pencil: draw freeform paths that are smoothed when you lift the pen.',
+    shaper:'Shaper: scribble a rough line, rectangle, triangle, or ellipse and it becomes a clean, editable shape.'
+  };
+  function aipUsePreset(key){
+    const p=AIP_PRESETS[key];if(!p)return;
+    if(p.base==='pen'){const m=$('curveDrawMode');if(m&&m.value!==p.curve){m.value=p.curve;m.dispatchEvent(new Event('change'));}dsSetMode('pen');}
+    else{
+      controls.inkAssist.value=p.ink;controls.inkStrength.value=p.strength;controls.pressureEnabled.checked=p.pressure;
+      try{saveInputPreferences();}catch(_){}
+      dsSetMode('draw');
+    }
+    aipUI.preset=key;aipSyncPresets();
+    if(AIP_PRESET_HELP[key])setStatus(AIP_PRESET_HELP[key],6000);
+  }
+  function aipSyncPresets(){
+    const base=dsUI.mode==='nodes'?'nodes':state.tool==='bezier'?'pen':state.tool;
+    if(aipUI.preset&&AIP_PRESETS[aipUI.preset]?.base!==base)aipUI.preset=null;
+    if(!aipUI.preset&&base==='pen')aipUI.preset=$('curveDrawMode')?.value==='bend'?'curvature':'pen';
+    if(!aipUI.preset&&base==='draw')aipUI.preset='pencil';
+    document.querySelectorAll('[data-aip-preset]').forEach(b=>{const on=!aipUI.tool&&b.dataset.aipPreset===aipUI.preset&&AIP_PRESETS[aipUI.preset]?.base===base;b.classList.toggle('ai-on',on);b.setAttribute('aria-pressed',String(on));});
+  }
+
+  // ----- Selection tools -----
+  function aipMergeSelection(ids,e){
+    const cur=new Set(state.selectedIds);
+    if(e.altKey)ids.forEach(id=>cur.delete(id));else if(e.shiftKey)ids.forEach(id=>cur.add(id));else return aipSelect(ids);
+    aipSelect([...cur]);
+  }
+  function aipWand(hit,e){
+    if(!hit){if(!e.shiftKey&&!e.altKey)aipSelect([]);return;}
+    const key=hit.fill?'fill':'stroke',val=hit[key]||null;
+    const ids=aipVisible().filter(o=>!o.locked&&(o[key]||null)===val&&(key==='stroke'?!o.fill:true)).map(o=>o.id);
+    aipMergeSelection(ids,e);setStatus(`Magic Wand: ${ids.length} object(s) with ${key} ${val||'none'}.`);
+  }
+  function aipInPoly(p,poly){let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)inside=!inside;}return inside;}
+  function aipLassoSelect(poly,e){
+    if(poly.length<3)return;
+    const ids=aipVisible().filter(o=>!o.locked&&aipInPoly(boundsCenter(objectAABB(o)),poly)).map(o=>o.id);
+    aipMergeSelection(ids,e);setStatus(`Lasso: ${ids.length} object(s).`);
+  }
+
+  // ----- Reflect / Shape Builder / Blend / Graph / Artboard -----
+  function aipReflect(p,horizontalAxis){
+    const objs=aipEditable();if(!objs.length){setStatus('Select objects before using the Reflect tool.');return;}
+    for(const o of objs){
+      const c=boundsCenter(baseBounds(o));
+      if(horizontalAxis){moveObjectFrom(o,deepClone(o),0,2*(p.y-c.y));o.flipV=!o.flipV;}
+      else{moveObjectFrom(o,deepClone(o),2*(p.x-c.x),0);o.flipH=!o.flipH;}
+      o.rotation=(360-(o.rotation||0))%360;
+    }
+    aipCommit();setStatus(`Reflected across a ${horizontalAxis?'horizontal':'vertical'} axis.`);
+  }
+  const AIP_MERGEABLE=new Set(['rect','ellipse','triangle','star']);
+  function aipShapeBuild(points,alt){
+    const hits=[];
+    for(const p of points){const h=hitTest(p.x,p.y);if(h&&!h.locked&&AIP_MERGEABLE.has(h.type)&&!hits.includes(h))hits.push(h);}
+    if(!hits.length){setStatus('Shape Builder: drag across overlapping rectangles, ellipses, triangles, or stars.');return;}
+    if(hits.length===1){if(alt){state.objects=state.objects.filter(o=>o!==hits[0]);state.selectedIds=[];aipCommit();setStatus('Shape Builder: shape deleted.');}else aipSelect([hits[0].id]);return;}
+    state.selectedIds=hits.map(o=>o.id);mergeSelectedShapes(alt?'subtract':'union');
+  }
+  function aipLerpColor(a,b,t){
+    if(!a&&!b)return null;if(!a||!b)return t<.5?a:b;
+    const h1=colorHex(a),h2=colorHex(b),c=i=>Math.round(parseInt(h1.slice(i,i+2),16)*(1-t)+parseInt(h2.slice(i,i+2),16)*t).toString(16).padStart(2,'0');
+    return '#'+c(1)+c(3)+c(5);
+  }
+  function aipMakeBlend(a,b,steps=aipUI.opts.blendSteps){
+    if(!a||!b||a===b){setStatus('Blend: choose two different objects.');return;}
+    if(['image','equation'].includes(a.type)||['image','equation'].includes(b.type)){setStatus('Blend works with shapes, lines, paths, and text — not images or equations.');return;}
+    const n=clamp(Math.round(steps)||5,1,50),ba=baseBounds(a),bb=baseBounds(b),made=[];
+    const lerp=(x,y,t)=>x+(y-x)*t;
+    for(let i=1;i<=n;i++){
+      const t=i/(n+1),o=deepClone(a);delete o.groupId;delete o.groupLabel;
+      scaleObjectToBounds(o,deepClone(a),ba,{x:lerp(ba.x,bb.x,t),y:lerp(ba.y,bb.y,t),w:Math.max(1,lerp(ba.w,bb.w,t)),h:Math.max(1,lerp(ba.h,bb.h,t))});
+      o.fill=aipLerpColor(a.fill,b.fill,t);o.stroke=aipLerpColor(a.stroke,b.stroke,t);
+      o.strokeWidth=lerp(a.strokeWidth??0,b.strokeWidth??0,t);o.opacity=lerp(a.opacity??1,b.opacity??1,t);o.rotation=lerp(a.rotation||0,b.rotation||0,t);
+      if(a.type==='text'&&b.type==='text')o.fontSize=lerp(a.fontSize||16,b.fontSize||16,t);
+      o.name=`Blend step ${i}`;made.push(o);
+    }
+    const g=gid();made.forEach(o=>{o.id=uid();o.groupId=g;o.groupLabel='Blend';});
+    const at=Math.min(state.objects.indexOf(a),state.objects.indexOf(b))+1;
+    state.objects.splice(at,0,...made);state.selectedIds=made.map(o=>o.id);aipCommit();
+    setStatus(`Blend: ${n} step${n>1?'s':''} created between ${objectName(a)} and ${objectName(b)}.`);
+  }
+  const AIP_GRAPHS={axes:['Axes',null],iv:['Diode I–V',stIV],cv:['MOS C–V',stCV],charge:['Charge density ρ(x)',stCharge],field:['Electric field E(x)',stField],curve:['Custom curve y = f(x)…',null]};
+  function aipInsertGraph(r){
+    const kind=aipUI.opts.graph;
+    if(kind==='curve'){buildCurve();return;}
+    const w=Math.max(80,r.w),h=Math.max(60,r.h);
+    const objs=kind==='axes'||!AIP_GRAPHS[kind]?.[1]?axes(0,0,w,h,'x','y'):AIP_GRAPHS[kind][1]();
+    placeGroup(objs,AIP_GRAPHS[kind]?.[0]||'Graph',{x:r.x,y:r.y});
+  }
+  function aipCropArtboard(r){
+    if(r.w<20||r.h<20){$('resizeCanvasBtn')?.click();return;}
+    const dx=-Math.round(r.x),dy=-Math.round(r.y);
+    state.objects.forEach(o=>offsetObject(o,dx,dy));
+    if(Array.isArray(state.studioDesign?.guides))state.studioDesign.guides.forEach(g=>{g.value+=g.axis==='x'?dx:dy;});
+    canvas.width=clamp(Math.round(r.w),200,5000);canvas.height=clamp(Math.round(r.h),200,5000);
+    applyZoom();saveHistory();render();renderLayers();syncControls();setStatus(`Artboard: ${canvas.width} × ${canvas.height} px.`);
+  }
+  const aipRect=(a,b,square)=>{let w=b.x-a.x,h=b.y-a.y;if(square){const s=Math.max(Math.abs(w),Math.abs(h));w=Math.sign(w||1)*s;h=Math.sign(h||1)*s;}return {x:Math.min(a.x,a.x+w),y:Math.min(a.y,a.y+h),w:Math.abs(w),h:Math.abs(h)};};
+
+  // ----- Draw Behind: new objects go to the bottom of the stacking order -----
+  function aipDrawBehindHook(){
+    const ids=new Set(state.objects.map(o=>o.id));
+    if(aipUI.drawMode==='behind'&&aipUI.knownIds){
+      const fresh=state.objects.filter(o=>!aipUI.knownIds.has(o.id));
+      if(fresh.length&&fresh.length<state.objects.length)state.objects=[...fresh,...state.objects.filter(o=>aipUI.knownIds.has(o.id))];
+    }
+    aipUI.knownIds=ids;
+  }
+  window.EECanvasDrawMode=mode=>{if(mode)aipUI.drawMode=mode==='behind'?'behind':'normal';setStatus(aipUI.drawMode==='behind'?'Draw Behind: new objects are placed behind everything else.':'Draw Normal: new objects are placed on top.');return aipUI.drawMode;};
+  window.EECanvasGetDrawMode=()=>aipUI.drawMode;
+
+  // ----- Contextual Task Bar (Illustrator 2024+) -----
+  function aipTaskBarInit(){
+    const bar=document.createElement('div');bar.id='aipTaskBar';bar.className='aip-taskbar';bar.hidden=true;bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Contextual task bar');
+    document.body.append(bar);
+    bar.addEventListener('pointerdown',e=>e.stopPropagation());
+    bar.addEventListener('click',e=>{
+      const b=e.target.closest('[data-tb]');if(!b)return;const a=b.dataset.tb;
+      if(a==='arrange'||a==='more'||a==='recolor'||a==='align'){
+        aimClose();const items=a==='more'?aimMenus().Object:a==='arrange'?aimMenus().Object.find(x=>x.l==='Arrange').sub:a==='align'?aimMenus().Object.find(x=>x.l==='Align').sub:aimMenus().Edit.find(x=>x.l==='Edit Colors').sub;
+        aim.top=b;const m=aimBuild(items,0);aimPlace(m,b.getBoundingClientRect(),false);return;
+      }
+      if(a==='hide'){aipUI.taskBar=false;aipStore.save();aipPlaceTaskBar();setStatus('Contextual Task Bar hidden. Window ▸ Contextual Task Bar shows it again.');return;}
+      ({duplicate:duplicateSelected,group:groupSelection,ungroup:ungroupSelection,lock:()=>aipLock(true),anchors:()=>dsSetMode('nodes'),blend:()=>{const s=selectedObjects();aipMakeBlend(s[0],s[1]);},delete:()=>deleteSelected(),
+        generate:()=>openAiDrawDialog(),templates:()=>openTemplateLibrary(),band:()=>buildBandDiagram()}[a])?.();
+      setTimeout(aipSync);
+    });
+    stage.addEventListener('scroll',()=>aipPlaceTaskBar(),{passive:true});window.addEventListener('resize',()=>aipPlaceTaskBar());
+    canvas.addEventListener('pointerdown',()=>{bar.hidden=true;});
+  }
+  function aipTaskBarButtons(objs){
+    const n=objs.length,single=n===1?objs[0]:null,grouped=objs.some(o=>o.groupId),sameGroup=n>1&&objs.every(o=>o.groupId&&o.groupId===objs[0].groupId);
+    const q=[];
+    if(n>1&&!sameGroup)q.push(['group','Group']);if(grouped)q.push(['ungroup','Ungroup']);
+    if(single&&['line','bezier','path'].includes(single.type))q.push(['anchors','Edit Anchors']);
+    if(n===2&&!grouped)q.push(['blend','Blend']);
+    q.push(['duplicate','Duplicate'],['arrange','Arrange ▾'],['align','Align ▾'],['recolor','Recolor ▾'],['lock','Lock'],['more','⋯']);
+    return q;
+  }
+  function aipPlaceTaskBar(){
+    const bar=$('aipTaskBar');if(!bar)return;
+    const objs=selectedObjects().filter(o=>o.visible!==false),busy=pointer.down||!!aipUI.drag||!!teSession||!!dsUI.draft||dsUI.mode==='nodes';
+    if(!aipUI.taskBar||!objs.length||busy||objs.every(o=>o.locked)){bar.hidden=true;return;}
+    const sig=aipTaskBarButtons(objs).map(x=>x.join(':')).join('|');
+    if(bar.dataset.sig!==sig){bar.dataset.sig=sig;bar.innerHTML=aipTaskBarButtons(objs).map(([a,l])=>`<button type="button" data-tb="${a}"${a==='more'?' title="More: Object menu"':''}>${l}</button>`).join('')+'<button type="button" data-tb="hide" class="aip-tb-hide" title="Hide the Contextual Task Bar" aria-label="Hide the Contextual Task Bar">×</button>';}
+    const b=unionBounds(objs),r=canvas.getBoundingClientRect(),k=r.width/canvas.width,s=stage.getBoundingClientRect();
+    bar.hidden=false;
+    let x=r.left+(b.x+b.w/2)*k-bar.offsetWidth/2,y=r.top+(b.y+b.h)*k+28;
+    if(y+bar.offsetHeight>s.bottom-8)y=r.top+b.y*k-bar.offsetHeight-28;
+    x=clamp(x,s.left+8,Math.max(s.left+8,s.right-bar.offsetWidth-8));y=clamp(y,s.top+8,Math.max(s.top+8,s.bottom-bar.offsetHeight-8));
+    bar.style.left=Math.round(x)+'px';bar.style.top=Math.round(y)+'px';
+  }
+
+  // ----- Pointer handling for the new modal tools -----
+  function aipDownExtra(e,p){
+    const t=aipUI.tool;
+    if(t==='wand'){aipWand(hitTest(p.x,p.y),e);return true;}
+    if(t==='reflect'){aipReflect(p,e.altKey);return true;}
+    if(t==='blend'){
+      const hit=hitTest(p.x,p.y);if(!hit){setStatus('Blend: click an object.');return true;}
+      if(!aipUI.blendFirst||!state.objects.includes(aipUI.blendFirst)){aipUI.blendFirst=hit;aipSelect([hit.id]);setStatus(`Blend: ${objectName(hit)} chosen. Click the second object.`);}
+      else{const a=aipUI.blendFirst;aipUI.blendFirst=null;aipMakeBlend(a,hit);}
+      return true;
+    }
+    return false;
   }
 
   aipInstallInput();
@@ -21134,6 +21355,7 @@ function dsSetNodeMode(o,index,mode){
   aipAddToolButtons();
   aipInit();
   aimInit();
+  aipTaskBarInit();
 
   loadInputPreferences();
 
@@ -22817,6 +23039,37 @@ html[data-theme="dark"] #dsTools .ai-tool.is-active,html[data-theme="dark"] #dsT
 body.ai-tools-docked .workspace{margin-left:var(--ai-dock-w,0px)}
 body.ai-tools-docked .stage-wrap{padding-left:34px!important}
 @media print{body.ai-tools-docked .workspace{margin-left:0}}
+/* Advanced toolbar: larger fill/stroke widget, draw modes, edit toolbar */
+#dsTools .ai-slot.ai-slot-off{display:none}
+#dsTools.ai-two-col .ai-fs{width:52px;height:52px}
+#dsTools.ai-two-col .ai-swatch{width:34px;height:34px}
+#dsTools.ai-two-col .ai-stroke{left:18px;top:18px;border-width:8px}
+#dsTools.ai-two-col .ai-modes button{width:18px;height:18px}
+#dsTools .ai-drawmodes,#dsTools .ai-extra-row{display:flex;gap:2px;justify-content:center}
+#dsTools .ai-drawmodes button{width:24px;height:22px;min-height:0;padding:0;border:0;border-radius:3px;background:transparent;color:var(--ai-icon)}
+#dsTools .ai-drawmodes button svg{width:15px;height:15px;stroke-width:1.4}
+#dsTools .ai-drawmodes button:hover{background:var(--ai-hover)}
+#dsTools .ai-drawmodes button.is-active{background:var(--ai-active);color:var(--ai-text)}
+#dsTools .ai-extra-row .ai-util-btn{width:28px;height:24px}
+#dsTools .ai-extra-row .ai-util-btn svg{width:16px;height:16px}
+#dsTools .ai-more{font:700 11px/1 Arial,sans-serif;letter-spacing:1px}
+.ai-edit-toolbar{width:260px;max-height:70vh;overflow:auto;padding:0 0 6px}
+.ai-et-head{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--ai-line);background:var(--ai-bg)}
+.ai-et-head button{min-height:0;padding:2px 8px;border:1px solid var(--ai-line);border-radius:3px;background:var(--ai-btn);color:var(--ai-text);font:11px "Segoe UI",system-ui,sans-serif}
+.ai-et-row{display:grid;grid-template-columns:16px 20px 1fr;align-items:center;gap:7px;padding:4px 10px;color:var(--ai-text);cursor:pointer}
+.ai-et-row:hover{background:var(--ai-hover)}
+.ai-et-row svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ai-et-row input{margin:0;accent-color:var(--ai-accent)}
+/* Contextual Task Bar */
+.aip-taskbar{position:fixed;z-index:150;display:flex;align-items:center;gap:2px;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--surface,#fff);box-shadow:0 4px 14px rgba(0,0,0,.16);font:12px "Segoe UI",system-ui,Arial,sans-serif}
+.aip-taskbar[hidden]{display:none!important}
+.aip-taskbar button{min-height:0;height:28px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:var(--text);font:inherit;white-space:nowrap;cursor:pointer}
+.aip-taskbar button:hover{background:var(--soft,rgba(9,105,218,.1))}
+.aip-taskbar .aip-tb-hide{padding:0 7px;color:var(--muted);font-size:15px}
+.aip-ov-lasso{fill:rgba(20,115,230,.06);stroke:#1473e6;stroke-width:1.2;stroke-dasharray:4 3}
+.aip-ov-builder{fill:none;stroke:#e11d48;stroke-width:2}
+.aip-ov-rect{fill:rgba(20,115,230,.06);stroke:#1473e6;stroke-width:1.2;stroke-dasharray:5 3}
+@media print{.aip-taskbar,.ai-edit-toolbar{display:none!important}}
 </style>
 <script id="ee-illustrator-toolbar-runtime">
 window.addEventListener('DOMContentLoaded',()=>{
@@ -22850,9 +23103,22 @@ window.addEventListener('DOMContentLoaded',()=>{
   carrier:'<circle cx="8" cy="9" r="3.6" fill="currentColor"/><circle cx="16.5" cy="15.5" r="3.6"/><path d="M15 15.5h3M16.5 14v3"/>',
   level:'<path d="M3 7h13M3 17h13"/><path d="M3 12h13" stroke-dasharray="2.5 2"/><path d="M18.5 5v4M18.5 15v4"/>',
   dimension:'<path d="M4 6v12M20 6v12M4 12h16"/><path d="m7.5 9-3.5 3 3.5 3M16.5 9l3.5 3-3.5 3"/>',
+  wand:'<path d="m4 20 10.5-10.5"/><path d="m13 8 3 3"/><path d="M17 3v3M20.5 6.5h-3M15.5 4.5l1 1M19 9.5l-.5-.5"/>',
+  lasso:'<ellipse cx="13" cy="9" rx="7.5" ry="5"/><path d="M7.5 12.5c-2 1-2 3.5.5 3.5 1.8 0 2 2-.5 4.5"/>',
+  curvature:'<path d="M4 18C7 6 17 6 20 18"/><circle cx="4" cy="18" r="1.6"/><circle cx="12" cy="9" r="1.6"/><circle cx="20" cy="18" r="1.6"/>',
+  paintbrush:'<path d="M20 4 11.5 12.5"/><path d="M13.5 14.5 9.5 10.5"/><path d="M9.5 12c-2.5 0-4 1.5-4 4 0 1.5-1 2.5-2 3 3 1 7.5.5 8-3"/>',
+  shaper:'<path d="M4 18c2-6 4-9 6-3s4 2 5-3"/><path d="M15 17h5v-5"/><circle cx="7" cy="6" r="2.5"/>',
+  reflect:'<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M9.5 7 4 17h5.5Z"/><path d="M14.5 7 20 17h-5.5Z"/>',
+  shapebuilder:'<circle cx="9" cy="10" r="5.5"/><circle cx="15" cy="10" r="5.5"/><path d="m14 15 2 6 1.3-2.5 2.7-.5Z" fill="currentColor"/>',
+  blend:'<rect x="3" y="9" width="5" height="5"/><circle cx="18.5" cy="11.5" r="3"/><path d="M8 11.5h7.5" stroke-dasharray="1.5 1.5"/>',
+  graph:'<path d="M4 4v16h16"/><path d="M8 16v-5M12 16V8M16 16v-7"/>',
+  artboard:'<path d="M7 3v18M17 3v18M3 7h18M3 17h18"/>',
   props:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   guides:'<path d="M3.5 3.5h17v17h-17ZM8 3.5v3M12 3.5v4.5M16 3.5v3M3.5 12H8M3.5 16h3"/>',
   styles:'<path d="M4 4h7v7H4ZM13 4h7v7h-7ZM4 13h7v7H4ZM13 13h7v7h-7Z"/>',
+  drawNormal:'<rect x="4" y="4" width="11" height="11" fill="currentColor" stroke="none"/><rect x="9" y="9" width="11" height="11"/>',
+  drawBehind:'<rect x="9" y="9" width="11" height="11" fill="currentColor" stroke="none"/><rect x="4" y="4" width="11" height="11" fill="var(--ai-bg)"/>',
+  screen:'<rect x="3" y="5" width="18" height="13" rx="1"/><path d="M8 21h8"/>',
   swap:'<path d="M2.5 3H7a2 2 0 0 1 2 2v4.5"/><path d="M4 1.5 2.5 3 4 4.5M7.5 8 9 9.5 10.5 8"/>'
  };
  const svg=(name,vb=24)=>`<svg viewBox="0 0 ${vb} ${vb}" aria-hidden="true" focusable="false">${ICON[name]||''}</svg>`;
@@ -22872,32 +23138,27 @@ window.addEventListener('DOMContentLoaded',()=>{
  for(const el of [...body.children])if(el!==tools)unused.append(el);
 
  // ----- Tool slots with Illustrator-style flyout groups
- const src={};tools.querySelectorAll('[data-ds-tool],[data-aip-tool]').forEach(b=>src[b.dataset.dsTool||b.dataset.aipTool]=b);
+ const src={};tools.querySelectorAll('[data-ds-tool],[data-aip-tool],[data-aip-preset]').forEach(b=>src[b.dataset.dsTool||b.dataset.aipTool||b.dataset.aipPreset]=b);
  const teSrc=k=>document.querySelector(`.ee-writing-tools [data-te-launch="${k}"]`)||document.querySelector(`[data-te-launch="${k}"]`);
  const proxy=(key,target)=>{if(!target)return null;const b=document.createElement('button');b.type='button';if(key.startsWith('te:'))b.dataset.aiTe=key.slice(3);else b.dataset.dsTool=key;b.addEventListener('click',()=>target.click());return b;};
  const memberButton=key=>src[key]||(key==='triangle'||key==='star'?proxy(key,document.querySelector(`#shapesToolGroup .tool-btn[data-tool="${key}"]`)):key.startsWith('te:')?proxy(key,teSrc(key.slice(3))):null);
+ // Illustrator's Advanced toolbar, read row by row in the two-column layout.
  const LAYOUT=[
-  [['select','Selection Tool','V']],
-  [['nodes','Direct Selection Tool — edit anchors','']],
-  'sep',
-  [['pen','Pen Tool','B']],
+  [['select','Selection Tool','V']],[['nodes','Direct Selection Tool','']],
+  [['wand','Magic Wand Tool','Y']],[['lasso','Lasso Tool','']],
+  [['pen','Pen Tool','B']],[['curvature','Curvature Tool','Shift+`']],
   [['te:text','Type Tool','T'],['te:heading','Heading Tool',''],['te:equation','Equation Tool','Q'],['te:boxed','Boxed Result Tool','']],
-  [['line','Line Segment Tool','L'],['arrow','Arrow Tool','A']],
-  [['rect','Rectangle Tool','R'],['ellipse','Ellipse Tool','O'],['triangle','Triangle Tool',''],['star','Star Tool','']],
-  [['draw','Pencil Tool','P']],
-  'sep',
-  [['eraser','Eraser Tool','E']],
-  'sep',
-  [['rotate','Rotate Tool','Shift+R'],['scale','Scale Tool','S']],
-  [['eyedropper','Eyedropper Tool','I'],['measure','Measure Tool','Shift+M']],
-  'sep',
-  [['carrier','Carrier Tool — electrons, holes, ions','Shift+C']],
-  [['level','Energy Level Tool — E_c, E_v, E_F…','Shift+L'],['dimension','Dimension Tool','Shift+D']],
-  'sep',
-  [['hand','Hand Tool','H']],
+  [['line','Line Segment Tool','L'],['arrow','Arrow Tool','A'],['dimension','Dimension Tool','Shift+D']],
+  [['rect','Rectangle Tool','R'],['ellipse','Ellipse Tool','O'],['triangle','Triangle Tool',''],['star','Star Tool','']],[['paintbrush','Paintbrush Tool','Shift+B']],
+  [['shaper','Shaper Tool','Shift+N'],['pencil','Pencil Tool','N']],[['eraser','Eraser Tool','E']],
+  [['rotate','Rotate Tool','Shift+R'],['reflect','Reflect Tool','']],[['scale','Scale Tool','S']],
+  [['shapebuilder','Shape Builder Tool','Shift+M']],[['level','Energy Level Tool — E_c, E_v, E_F…','Shift+L']],
+  [['eyedropper','Eyedropper Tool','I'],['measure','Measure Tool','']],[['blend','Blend Tool','W']],
+  [['carrier','Carrier Sprayer — electrons, holes, ions','Shift+C']],[['graph','Graph Tool','J']],
+  [['artboard','Artboard Tool','Shift+O']],[['hand','Hand Tool','H']],
   [['zoom','Zoom Tool','Z']]
  ];
- const iconKey=k=>k.replace('te:','');
+ const iconKey=k=>({nodes:'nodes',pencil:'draw'}[k]||k.replace('te:',''));
  const show=s=>s.members.forEach(m=>{m.b.hidden=m!==s.current;});
  const slots=[];
  tools.replaceChildren();
@@ -22955,7 +23216,9 @@ window.addEventListener('DOMContentLoaded',()=>{
   <button type="button" class="ai-mini ai-default" id="aiDefault" title="Default Fill and Stroke (D): black stroke, no fill" aria-label="Default fill and stroke"><i></i><i></i></button>
   <input type="color" id="aiFillPick" tabindex="-1" aria-hidden="true"><input type="color" id="aiStrokePick" tabindex="-1" aria-hidden="true">
  </div>
- <div class="ai-modes"><button type="button" id="aiColorMode" title="Color: apply the fill color" aria-label="Color fill"><i></i></button><button type="button" id="aiNoneMode" title="None: remove the fill (/)" aria-label="No fill"><i></i></button></div>`;
+ <div class="ai-modes"><button type="button" id="aiColorMode" title="Color: apply the fill color (,)" aria-label="Color fill"><i></i></button><button type="button" id="aiNoneMode" title="None: remove the fill (/)" aria-label="No fill"><i></i></button></div>
+ <div class="ai-drawmodes" role="radiogroup" aria-label="Drawing modes"><button type="button" data-drawmode="normal" title="Draw Normal: new objects go on top" aria-label="Draw Normal">${svg('drawNormal')}</button><button type="button" data-drawmode="behind" title="Draw Behind: new objects go behind everything" aria-label="Draw Behind">${svg('drawBehind')}</button></div>
+ <div class="ai-extra-row"><button type="button" class="ai-util-btn ai-screen" id="aiScreenMode" title="Change Screen Mode (F)" aria-label="Change screen mode">${svg('screen')}</button><button type="button" class="ai-util-btn ai-more" id="aiEditToolbar" title="Edit Toolbar: show or hide tools" aria-label="Edit toolbar">•••</button></div>`;
  tools.append(color);
  const fs=color.querySelector('.ai-fs'),fillSw=$('aiFillSwatch'),strokeSw=$('aiStrokeSwatch');
  const front=()=>fs.dataset.front;
@@ -22978,6 +23241,31 @@ window.addEventListener('DOMContentLoaded',()=>{
  const setNone=on=>{if(front()!=='fill')return;$('dsNoFill').checked=on;fire($('dsNoFill'));paint();};
  $('aiSwap').onclick=swap;$('aiDefault').onclick=defaults;$('aiColorMode').onclick=()=>setNone(false);$('aiNoneMode').onclick=()=>setNone(true);
  setInterval(paint,250);paint();
+
+ // ----- Draw Normal / Behind, Screen Mode, and Edit Toolbar -----
+ const syncDrawModes=()=>{const m=window.EECanvasGetDrawMode?.()||'normal';color.querySelectorAll('[data-drawmode]').forEach(b=>{const on=b.dataset.drawmode===m;b.classList.toggle('is-active',on);b.setAttribute('aria-checked',String(on));});};
+ color.querySelectorAll('[data-drawmode]').forEach(b=>{b.setAttribute('role','radio');b.onclick=()=>{window.EECanvasDrawMode?.(b.dataset.drawmode);syncDrawModes();};});syncDrawModes();
+ const screenMode=()=>{
+  if(document.fullscreenElement){document.exitFullscreen?.();return;}
+  const req=document.documentElement.requestFullscreen?.();if(req?.catch)req.catch(()=>{});
+ };
+ $('aiScreenMode').onclick=screenMode;window.EECanvasScreenMode=screenMode;
+ document.addEventListener('fullscreenchange',()=>{const on=!!document.fullscreenElement;$('aiScreenMode').classList.toggle('is-active',on);$('aiScreenMode').title=on?'Exit Full Screen Mode (F)':'Full Screen Mode (F)';});
+ const hiddenKey='eeCanvasAiHiddenTools';
+ const hiddenSet=()=>{try{return new Set(JSON.parse(store.get(hiddenKey,'[]')));}catch(_){return new Set();}};
+ const applyHidden=()=>{const h=hiddenSet();for(const sl of slots)sl.el.classList.toggle('ai-slot-off',h.has(sl.members[0].key));};
+ const editPop=document.createElement('div');editPop.className='ai-flyout ai-edit-toolbar';editPop.hidden=true;editPop.setAttribute('role','dialog');editPop.setAttribute('aria-label','Edit toolbar');document.body.append(editPop);
+ function openEditToolbar(){
+  const h=hiddenSet();
+  editPop.innerHTML='<div class="ai-et-head"><strong>All Tools</strong><button type="button" id="aiEtReset">Reset</button></div>'+slots.map(sl=>`<label class="ai-et-row"><input type="checkbox" data-key="${sl.members[0].key}"${h.has(sl.members[0].key)?'':' checked'}>${svg(iconKey(sl.members[0].key))}<span>${sl.members.map(m=>m.name.replace(/ Tool.*$| —.*$/,'')).join(', ')}</span></label>`).join('');
+  editPop.hidden=false;const r=$('aiEditToolbar').getBoundingClientRect();
+  editPop.style.left=Math.min(r.right+6,innerWidth-editPop.offsetWidth-6)+'px';editPop.style.top=Math.max(6,Math.min(r.top-editPop.offsetHeight+r.height,innerHeight-editPop.offsetHeight-6))+'px';
+  editPop.querySelectorAll('input').forEach(i=>i.onchange=()=>{const s2=hiddenSet();i.checked?s2.delete(i.dataset.key):s2.add(i.dataset.key);if(i.dataset.key==='select')i.checked=true,s2.delete('select');store.set(hiddenKey,JSON.stringify([...s2]));applyHidden();});
+  $('aiEtReset').onclick=()=>{store.set(hiddenKey,'[]');applyHidden();openEditToolbar();};
+ }
+ $('aiEditToolbar').onclick=()=>editPop.hidden?openEditToolbar():(editPop.hidden=true);
+ window.addEventListener('pointerdown',e=>{if(!editPop.hidden&&!editPop.contains(e.target)&&e.target!==$('aiEditToolbar'))editPop.hidden=true;},true);
+ applyHidden();
 
  // ----- Utility buttons: Properties, guides, styles
  sep();
@@ -23039,7 +23327,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   else if(k==='/'){e.preventDefault();setFront('fill');setNone(true);}
  },true);
 
- setCols(store.get('eeCanvasAiCols','1')==='2'?2:1);
+ setCols(store.get('eeCanvasAiCols','2')==='2'?2:1);
 
  // ----- Docked tool column (Illustrator's default), or a floating panel -----
  // Docked, the strip fills a left column and the workspace starts to its
