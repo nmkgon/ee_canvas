@@ -23396,6 +23396,58 @@ window.addEventListener('DOMContentLoaded',()=>{
  setDock(store.get('eeCanvasAiDock','1')!=='0');
 });
 </script>
+<style id="ee-suite-polish-v1">
+/* Commercial polish shared with the MAESTRA suite: monochrome icons in place
+   of emoji, compact Illustrator-style panel tabs, a tidy zoom bar, and a
+   quieter status toast. */
+.topbar .ee-writing-tools{display:none!important}
+.s-ico{display:inline-block;width:16px;height:16px;vertical-align:-3px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#undoBtn,#redoBtn{display:inline-grid;place-items:center}
+#saveBtn .s-ico{margin-right:4px}
+.tool-group-menu>summary .group-icon,.compact-option-menu>summary .option-icon{display:inline-grid;place-items:center}
+.s-badge{flex:0 0 auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--b1,#ff7c00),var(--b2,#f24e1e));color:#fff;font:800 12px/1 "Segoe UI",system-ui,Arial,sans-serif;letter-spacing:-.2px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.topbar>.s-badge{margin:0 4px 0 2px}
+/* Right panel tabs, like Illustrator's Properties / Layers tab strip */
+.rightbar .tabs{display:flex!important;gap:0!important;padding:0!important;background:var(--surface-2)!important;border-bottom:1px solid var(--line)!important}
+.rightbar .tabs .tab{flex:0 0 auto!important;min-height:0!important;height:30px!important;padding:0 12px!important;border:0!important;border-right:1px solid var(--line)!important;border-radius:0!important;background:transparent!important;color:var(--muted)!important;font:600 12px "Segoe UI",system-ui,Arial,sans-serif!important;box-shadow:none!important}
+.rightbar .tabs .tab.active{background:var(--panel)!important;color:var(--text)!important;box-shadow:inset 0 -2px 0 var(--brand,#1473e6)!important}
+/* Zoom bar */
+.zoom-box{gap:2px!important;padding:3px!important;border-radius:6px!important;box-shadow:0 2px 8px rgba(0,0,0,.12)!important}
+.zoom-box button{width:auto!important;min-width:26px!important;height:26px!important;min-height:0!important;padding:0 8px!important;border:0!important;border-radius:4px!important;background:transparent!important;color:var(--text)!important;font:600 12px "Segoe UI",system-ui,Arial,sans-serif!important;white-space:nowrap}
+.zoom-box button:hover{background:var(--surface-2)!important}
+#zoomValue{min-width:44px;text-align:center;font:600 12px "Segoe UI",system-ui,Arial,sans-serif;font-variant-numeric:tabular-nums}
+/* Status toast: one or two lines, full text on hover */
+.statusbar#status{max-width:min(560px,70%)!important;padding:6px 12px!important;border-radius:6px!important;font:12px/1.4 "Segoe UI",system-ui,Arial,sans-serif!important;display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden!important;box-shadow:0 4px 14px rgba(0,0,0,.14)!important}
+</style>
+<script id="ee-suite-polish-runtime">
+window.addEventListener('DOMContentLoaded',()=>{
+ const $=id=>document.getElementById(id);
+ const I={
+  undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  redo:'<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
+  save:'<path d="M5 3h11l3 3v15H5Z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/>',
+  key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3M14 9l2 2"/>',
+  sparkSigma:'<path d="M14 6H6l4.5 6L6 18h8"/><path d="M18.5 3v4M16.5 5h4"/>',
+  sparkQ:'<path d="M8 9a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.2-1.5 2.3V15"/><circle cx="11.5" cy="18.5" r=".6" fill="currentColor"/><path d="M19 3v4M17 5h4"/>',
+  shapes:'<rect x="3" y="12" width="8" height="8"/><circle cx="17" cy="16" r="4"/><path d="M12 3 16 10H8Z"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',style:'<circle cx="12" cy="12" r="8.5"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="8.5" cy="13.5" r="1.2" fill="currentColor"/><path d="M13 17a2 2 0 0 1 2-2h3"/>',
+  pen:'<path d="m4 20 1-4 9.5-9.5 3 3L8 19Z"/><path d="m13 8 3 3"/>',arrange:'<rect x="4" y="4" width="10" height="10"/><rect x="10" y="10" width="10" height="10" fill="var(--panel,#fff)"/>'
+ };
+ const svg=k=>`<svg class="s-ico" viewBox="0 0 24 24" aria-hidden="true">${I[k]}</svg>`;
+ const setIcon=(el,k)=>{if(el){el.innerHTML=svg(k);}};
+ setIcon($('undoBtn'),'undo');setIcon($('redoBtn'),'redo');
+ const save=$('saveBtn');if(save){const t=save.querySelector('.btn-text');save.innerHTML=svg('save');if(t)save.append(t);}
+ setIcon($('apiSettingsToolBtn'),'key');setIcon($('recognizeSelectionBtn'),'sparkSigma');setIcon($('aiAssistSelectionBtn'),'sparkQ');
+ setIcon(document.querySelector('#shapesToolGroup .group-icon'),'shapes');setIcon(document.querySelector('#insertToolGroup .group-icon'),'plus');
+ setIcon(document.querySelector('#compactStyleMenu .option-icon'),'style');setIcon(document.querySelector('#compactPenMenu .option-icon'),'pen');setIcon(document.querySelector('#compactArrangeMenu .option-icon'),'arrange');
+ // Product badge, like Adobe's app marks, when the canvas runs on its own.
+ let standalone=true;try{standalone=window.top===window;}catch(_){standalone=false;}
+ const top=document.querySelector('.topbar');
+ if(standalone&&top&&!top.querySelector('.s-badge')){const b=document.createElement('span');b.className='s-badge';b.textContent='Ec';b.title='EE Canvas';b.setAttribute('aria-hidden','true');top.prepend(b);}
+ // Keep the full status text available when the toast is clamped.
+ const status=$('status');if(status)new MutationObserver(()=>{status.title=status.textContent.trim();}).observe(status,{childList:true,characterData:true,subtree:true});
+});
+</script>
 </body>
 <!-- AI reliability audit v3.0: shared-model alignment, safer Gemini authentication headers, clearer empty-response errors. -->
 </html>
