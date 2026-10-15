@@ -20593,7 +20593,7 @@ function dsSetNodeMode(o,index,mode){
     if(n>1&&!(grouped&&new Set(objs.map(o=>o.groupId)).size===1&&objs.every(o=>o.groupId)))q.push(['group','Group']);
     if(grouped)q.push(['ungroup','Ungroup']);
     if(single&&['line','bezier','path'].includes(single.type)&&!single.locked)q.push(['anchors','Edit Anchors']);
-    if(single?.type==='image'&&!single.locked)q.push(['imageEdit','Edit with AI…'],['vectorize','Image Trace']);
+    if(single?.type==='image'&&!single.locked&&!aipSecure())q.push(['imageEdit','Edit with AI…'],['vectorize','Image Trace']);
     q.push(['front','Bring to Front'],['forward','Bring Forward'],['backward','Send Backward'],['back','Send to Back']);
     q.push(['duplicate','Duplicate'],[ 'lock',locked?'Unlock':'Lock'],['template','Save as Template…'],['delete','Delete']);
     return q;
@@ -20937,9 +20937,9 @@ function dsSetNodeMode(o,index,mode){
       Edit:[
         {l:'Undo',k:'Ctrl+Z',f:()=>restoreHistory(state.historyIndex-1),d:state.historyIndex<=0},
         {l:'Redo',k:'Shift+Ctrl+Z',f:()=>restoreHistory(state.historyIndex+1),d:state.historyIndex>=state.history.length-1},'-',
-        {l:'Cut',k:'Ctrl+X',f:aipCut,d:!sel},{l:'Copy',k:'Ctrl+C',f:copySelected,d:!sel},
-        {l:'Paste',k:'Ctrl+V',f:pasteClipboard,d:!hasClip},{l:'Paste in Front',k:'Ctrl+F',f:()=>aipPaste('front'),d:!hasClip},
-        {l:'Paste in Back',k:'Ctrl+B',f:()=>aipPaste('back'),d:!hasClip},{l:'Paste in Place',k:'Shift+Ctrl+V',f:()=>aipPaste('place'),d:!hasClip},
+        {l:'Cut',k:'Ctrl+X',f:aipCut,d:!sel,clip:true},{l:'Copy',k:'Ctrl+C',f:copySelected,d:!sel,clip:true},
+        {l:'Paste',k:'Ctrl+V',f:pasteClipboard,d:!hasClip,clip:true},{l:'Paste in Front',k:'Ctrl+F',f:()=>aipPaste('front'),d:!hasClip,clip:true},
+        {l:'Paste in Back',k:'Ctrl+B',f:()=>aipPaste('back'),d:!hasClip,clip:true},{l:'Paste in Place',k:'Shift+Ctrl+V',f:()=>aipPaste('place'),d:!hasClip,clip:true},
         {l:'Duplicate',k:'Ctrl+D',f:duplicateSelected,d:!sel},{l:'Clear',k:'Del',f:()=>deleteSelected(),d:!sel},'-',
         {l:'Edit Colors',sub:[
           {l:'Convert to Grayscale',f:()=>aipRecolor((r,g,b)=>{const y=.299*r+.587*g+.114*b;return [y,y,y];},'Converted to grayscale — check that figure regions still read clearly in print.'),d:!sel},
@@ -20967,7 +20967,7 @@ function dsSetNodeMode(o,index,mode){
         {l:'Path',sub:[{l:'Edit Anchor Points',f:()=>dsSetMode('nodes'),d:!(single&&['line','bezier','path'].includes(single.type))},{l:'Pen Tool',k:'B',f:()=>dsSetMode('pen')}]},
         {l:'Shape Merge (Pathfinder)',sub:[['union','Unite'],['subtract','Minus Front'],['intersect','Intersect'],['combine','Exclude'],['release','Release']].map(([m,l])=>({l,f:()=>mergeSelectedShapes(m),d:m==='release'?!sel:n<2}))},
         {l:'Blend',sub:[{l:'Make',k:'Alt+Ctrl+B',f:()=>{const s2=selectedObjects();aipMakeBlend(s2[0],s2[1]);},d:n!==2},{l:'Blend Tool',k:'W',f:()=>aipSetTool('blend')}]},
-        {l:'Image',sub:[{l:'Edit with AI…',f:click('editAiImageBtn'),d:single?.type!=='image'},{l:'Image Trace (Convert to Vector)',f:click('vectorizeImageBtn'),d:single?.type!=='image'}]},'-',
+        {l:'Image',ai:true,sub:[{l:'Edit with AI…',f:click('editAiImageBtn'),d:single?.type!=='image'},{l:'Image Trace (Convert to Vector)',f:click('vectorizeImageBtn'),d:single?.type!=='image'}]},'-',
         {l:'Artboards',sub:[{l:'Fit to Artwork Bounds',f:()=>aipFitArtboard(false)},{l:'Fit to Selected Art',f:()=>aipFitArtboard(true),d:!sel},{l:'Artboard Size…',f:click('resizeCanvasBtn')},{l:'Journal Setup…',f:click('journalSetupBtn')}]}
       ],
       Type:[
@@ -21019,7 +21019,7 @@ function dsSetNodeMode(o,index,mode){
       ],
       'Solid State':[
         {l:'Band Diagram…',f:()=>buildBandDiagram()},{l:'Layer Stack…',f:()=>buildLayerStack()},{l:'Curve / Plot…',f:()=>buildCurve()},
-        {l:'AI Visual Creator…',f:()=>openAICreator('auto')},{l:'Template Library…',k:'K',f:()=>openTemplateLibrary()},'-',
+        {l:'AI Visual Creator…',f:()=>openAICreator('auto'),ai:true},{l:'Template Library…',k:'K',f:()=>openTemplateLibrary()},'-',
         ...STENCILS.map(sec=>({l:sec.g,sub:sec.items.map(([label,make])=>({l:label.replace(/\\([A-Za-z]+)/g,(t,w)=>SCI_SYMBOLS[w]||t),f:()=>placeGroup(make(),label)}))})),'-',
         {l:'Apply Material',sub:Object.keys(MAT).map(k=>({l:AIP_MAT_NAMES[k]||k,sw:MAT[k].fill,f:()=>aipApplyMaterial(k),d:!shapes}))},'-',
         tool('carrier','Carrier Tool','Shift+C'),tool('level','Energy Level Tool','Shift+L'),tool('dimension','Dimension Tool','Shift+D'),tool('measure','Measure Tool',''),tool('graph','Graph Tool','J'),'-',
@@ -21027,7 +21027,7 @@ function dsSetNodeMode(o,index,mode){
       ],
       Help:[
         {l:'Keyboard Shortcuts',f:()=>window.EECanvasOpenShortcuts?.(),d:!window.EECanvasOpenShortcuts},
-        {l:'Command Palette',f:()=>window.EECanvasOpenCommands?.(),d:!window.EECanvasOpenCommands},'-',
+        {l:'Command Palette',f:()=>window.EECanvasOpenCommands?.(),d:!window.EECanvasOpenCommands,ai:true},'-',
         {l:'Tool Tips: '+(aipUI.tool?AIP_TOOL_HELP[aipUI.tool].split(':')[0]:'current tool'),f:()=>setStatus(aipUI.tool?AIP_TOOL_HELP[aipUI.tool]:'Hover a tool for its name and shortcut; right-click or long-press a tool with a corner triangle for related tools.',8000)}
       ]
     };
@@ -21056,6 +21056,20 @@ function dsSetNodeMode(o,index,mode){
     });
     aim.stack.push(menu);document.body.append(menu);return menu;
   }
+  // The secure student workspace blocks clipboard use and every AI request
+  // except handwriting-to-equation, so its menus leave those commands out.
+  function aipSecure(){return document.body.classList.contains('ee-student-canvas-secure');}
+  function aipSecureFilter(items){
+    if(!aipSecure())return items;
+    const out=[];
+    for(const it of items){
+      if(it!=='-'&&(it.clip||it.ai))continue;
+      if(it==='-'&&(!out.length||out.at(-1)==='-'))continue;
+      out.push(it!=='-'&&Array.isArray(it.sub)?{...it,sub:aipSecureFilter(it.sub)}:it);
+    }
+    while(out.at(-1)==='-')out.pop();
+    return out;
+  }
   function aimTrim(level){while(aim.stack.length>level)aim.stack.pop().remove();aim.stack.at(-1)?.querySelectorAll('.aim-item.is-open').forEach(b=>b.classList.remove('is-open'));}
   function aimPlace(menu,r,side){
     const w=menu.offsetWidth,h=menu.offsetHeight;
@@ -21066,7 +21080,8 @@ function dsSetNodeMode(o,index,mode){
   }
   function aimOpen(btn){
     aimClose();aim.top=btn;btn.classList.add('is-open');btn.setAttribute('aria-expanded','true');
-    const menu=aimBuild(aimMenus()[btn.dataset.menu]||[],0);aimPlace(menu,btn.getBoundingClientRect(),false);
+    const menus=aimMenus(),items=btn.dataset.menu==='*'?Object.entries(menus).map(([l,sub])=>({l,sub})):menus[btn.dataset.menu]||[];
+    const menu=aimBuild(aipSecureFilter(items),0);aimPlace(menu,btn.getBoundingClientRect(),false);
   }
   function aimInit(){
     const editMenu=$('editMenu');if(!editMenu)return;
@@ -21076,9 +21091,13 @@ function dsSetNodeMode(o,index,mode){
       b.addEventListener('click',e=>{e.stopPropagation();aim.top===b?aimClose():aimOpen(b);});
       b.addEventListener('mouseenter',()=>{if(aim.top&&aim.top!==b)aimOpen(b);});
       b.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();if(aim.top!==b)aimOpen(b);aim.stack[0]?.querySelector('.aim-item:not(:disabled)')?.focus();}
-        else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const tops=[...bar.children],nx=tops[(tops.indexOf(b)+(e.key==='ArrowRight'?1:tops.length-1))%tops.length];nx.focus();if(aim.top)aimOpen(nx);}});
+        else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const tops=[...bar.children].filter(x=>x.offsetParent),nx=tops[(tops.indexOf(b)+(e.key==='ArrowRight'?1:tops.length-1))%tops.length];nx.focus();if(aim.top)aimOpen(nx);}});
       bar.append(b);
     }
+    // Narrow windows show one "Menu" button holding every menu as a submenu.
+    const all=document.createElement('button');all.type='button';all.className='aim-top aim-all';all.dataset.menu='*';all.textContent='☰ Menu';all.title='Menus';all.setAttribute('aria-haspopup','menu');all.setAttribute('aria-expanded','false');
+    all.addEventListener('click',e=>{e.stopPropagation();aim.top===all?aimClose():aimOpen(all);});
+    bar.prepend(all);
     editMenu.after(bar);editMenu.classList.add('aim-replaced');
     document.addEventListener('pointerdown',e=>{if(aim.top&&!e.target.closest('.aim-menu,.aim-bar'))aimClose();},true);
     window.addEventListener('resize',aimClose);window.addEventListener('blur',aimClose);
@@ -21093,6 +21112,8 @@ function dsSetNodeMode(o,index,mode){
     if(aim.top&&key==='escape'){aimClose();return true;}
     const run=fn=>{e.preventDefault();e.stopPropagation();fn();return true;};
     if(mod){
+      // Leave clipboard keys to the secure student workspace's own blocker.
+      if(aipSecure()&&(key==='x'||key==='v'||((key==='f'||key==='b')&&!e.altKey)))return false;
       if(key==='x')return run(aipCut);
       if(key==='a')return run(()=>e.shiftKey?aipSelect([]):aipSelect(aipVisible().filter(o=>!o.locked).map(o=>o.id)));
       if(key==='v'&&e.shiftKey)return run(()=>aipPaste('place'));
@@ -21303,7 +21324,7 @@ function dsSetNodeMode(o,index,mode){
       const b=e.target.closest('[data-tb]');if(!b)return;const a=b.dataset.tb;
       if(a==='arrange'||a==='more'||a==='recolor'||a==='align'){
         aimClose();const items=a==='more'?aimMenus().Object:a==='arrange'?aimMenus().Object.find(x=>x.l==='Arrange').sub:a==='align'?aimMenus().Object.find(x=>x.l==='Align').sub:aimMenus().Edit.find(x=>x.l==='Edit Colors').sub;
-        aim.top=b;const m=aimBuild(items,0);aimPlace(m,b.getBoundingClientRect(),false);return;
+        aim.top=b;const m=aimBuild(aipSecureFilter(items),0);aimPlace(m,b.getBoundingClientRect(),false);return;
       }
       if(a==='hide'){aipUI.taskBar=false;aipStore.save();aipPlaceTaskBar();setStatus('Contextual Task Bar hidden. Window ▸ Contextual Task Bar shows it again.');return;}
       ({duplicate:duplicateSelected,group:groupSelection,ungroup:ungroupSelection,lock:()=>aipLock(true),anchors:()=>dsSetMode('nodes'),blend:()=>{const s=selectedObjects();aipMakeBlend(s[0],s[1]);},delete:()=>deleteSelected(),
@@ -23002,6 +23023,8 @@ html[data-theme="dark"] #dsTools .ai-tool.is-active,html[data-theme="dark"] #dsT
 .aim-bar{display:flex;align-items:center;gap:0;flex:0 0 auto;font:12.5px/1 "Segoe UI",system-ui,Arial,sans-serif}
 .aim-top{height:28px;min-height:0;padding:0 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text);font:inherit;cursor:default;white-space:nowrap}
 .aim-top:hover,.aim-top.is-open{background:var(--soft,rgba(9,105,218,.1));border-color:var(--soft-border,transparent)}
+.aim-bar .aim-all{display:none}
+@media(max-width:999px){.aim-bar .aim-top:not(.aim-all){display:none}.aim-bar .aim-all{display:inline-block}}
 .aim-top:focus-visible{outline:2px solid var(--brand,#1473e6);outline-offset:-2px}
 .aim-menu{position:fixed;z-index:400;min-width:220px;max-height:calc(100vh - 12px);overflow-y:auto;padding:4px 0;border:1px solid var(--line);border-radius:6px;background:var(--surface,#fff);color:var(--text);box-shadow:0 4px 12px rgba(0,0,0,.14),0 12px 32px rgba(0,0,0,.12);font:12px/1.3 "Segoe UI",system-ui,Arial,sans-serif}
 .aim-item{display:flex;align-items:center;gap:6px;width:100%;height:26px;min-height:0;padding:0 14px 0 6px;border:0;border-radius:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:default}
@@ -23307,12 +23330,16 @@ window.addEventListener('DOMContentLoaded',()=>{
  }).observe(nodeTools,{attributes:true,attributeFilter:['hidden']});
 
  // ----- Single / double column toggle (the » control in the header)
- function setCols(n){
+ function setCols(n,remember){
   strip.classList.toggle('ai-two-col',n===2);colBtn.textContent=n===2?'«':'»';
   colBtn.title=n===2?'Single-column toolbar':'Double-column toolbar';colBtn.setAttribute('aria-label',colBtn.title);
-  store.set('eeCanvasAiToolCols',String(n));
+  if(remember)store.set('eeCanvasAiToolCols',String(n));
  }
- colBtn.onclick=()=>setCols(strip.classList.contains('ai-two-col')?1:2);
+ // Two columns by default; narrow windows (such as a canvas embedded in a
+ // grading column) get one column unless a layout was chosen explicitly.
+ const autoCols=()=>{const saved=store.get('eeCanvasAiToolCols','');return saved==='1'?1:saved==='2'?2:(innerWidth<900?1:2);};
+ colBtn.onclick=()=>setCols(strip.classList.contains('ai-two-col')?1:2,true);
+ window.addEventListener('resize',()=>{if(!store.get('eeCanvasAiToolCols','')){const n=autoCols();if(n!==(strip.classList.contains('ai-two-col')?2:1))setCols(n,false);}});
 
  new MutationObserver(closeFly).observe(strip,{attributes:true,attributeFilter:['style','hidden']});
  window.addEventListener('resize',closeFly);
@@ -23328,7 +23355,7 @@ window.addEventListener('DOMContentLoaded',()=>{
  },true);
 
  // A new key: older versions saved '1' on every load, which hid the two-column default.
- setCols(store.get('eeCanvasAiToolCols','2')==='1'?1:2);
+ setCols(autoCols(),false);
 
  // ----- Docked tool column (Illustrator's default), or a floating panel -----
  // Docked, the strip fills a left column and the workspace starts to its
