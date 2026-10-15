@@ -23061,6 +23061,10 @@ html[data-theme="dark"] #dsTools .ai-tool.is-active,html[data-theme="dark"] #dsT
 #dsTools.ai-toolbar.ai-docked .ds-head{cursor:grab}
 body.ai-tools-docked .workspace{margin-left:var(--ai-dock-w,0px)}
 body.ai-tools-docked .stage-wrap{padding-left:34px!important}
+/* Room above the artboard for the top ruler (rulers sit 23 px outside it).
+   The id keeps host compact skins such as .stage-wrap{padding:18px} from
+   pushing the ruler numbers up under the toolbar. */
+#stageWrap.stage-wrap{padding-top:32px!important}
 @media print{body.ai-tools-docked .workspace{margin-left:0}}
 /* Advanced toolbar: larger fill/stroke widget, draw modes, edit toolbar */
 #dsTools .ai-slot.ai-slot-off{display:none}
