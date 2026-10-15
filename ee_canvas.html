@@ -23310,7 +23310,7 @@ window.addEventListener('DOMContentLoaded',()=>{
  function setCols(n){
   strip.classList.toggle('ai-two-col',n===2);colBtn.textContent=n===2?'«':'»';
   colBtn.title=n===2?'Single-column toolbar':'Double-column toolbar';colBtn.setAttribute('aria-label',colBtn.title);
-  store.set('eeCanvasAiCols',String(n));
+  store.set('eeCanvasAiToolCols',String(n));
  }
  colBtn.onclick=()=>setCols(strip.classList.contains('ai-two-col')?1:2);
 
@@ -23327,7 +23327,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   else if(k==='/'){e.preventDefault();setFront('fill');setNone(true);}
  },true);
 
- setCols(store.get('eeCanvasAiCols','2')==='2'?2:1);
+ // A new key: older versions saved '1' on every load, which hid the two-column default.
+ setCols(store.get('eeCanvasAiToolCols','2')==='1'?1:2);
 
  // ----- Docked tool column (Illustrator's default), or a floating panel -----
  // Docked, the strip fills a left column and the workspace starts to its
