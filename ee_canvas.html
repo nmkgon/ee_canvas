@@ -20992,7 +20992,8 @@ function dsSetNodeMode(o,index,mode){
         {l:'Layers',f:()=>aipShowPanel('layersPanel'),c:!!ws?.classList.contains('panel-open')&&$('layersPanel')?.classList.contains('active')},
         {l:'Solid-State Kit',f:()=>aipShowPanel('ssPanel'),c:!!ws?.classList.contains('panel-open')&&$('ssPanel')?.classList.contains('active')},
         {l:'Hide Side Panels',f:()=>{if(ws?.classList.contains('panel-open'))$('panelToggleBtn')?.click();},d:!ws?.classList.contains('panel-open')},'-',
-        {l:'Toolbar',f:()=>{const t=$('dsTools');if(t)t.hidden=!t.hidden;},c:!$('dsTools')?.hidden},
+        {l:'Tools',f:()=>{const t=$('dsTools');if(t)t.hidden=!t.hidden;},c:!$('dsTools')?.hidden},
+        {l:'Dock Tools Panel',f:()=>window.EECanvasDockTools?.(),c:!!window.EECanvasToolsDocked?.(),d:!!$('dsTools')?.hidden},
         {l:'Rulers & Guides',f:click('dsGuideOpen'),c:!$('dsGuides')?.hidden},{l:'Drawing Styles',f:click('dsStyleOpen'),c:!$('dsStyles')?.hidden},
         {l:'Template Library',k:'K',f:()=>openTemplateLibrary()}
       ],
@@ -22810,6 +22811,12 @@ html[data-theme="dark"] #dsTools .ai-tool.is-active,html[data-theme="dark"] #dsT
 #aipToolOptsExtra input[type=text]{flex:1}
 @media print{.aim-menu,#aipOverlay{display:none!important}}
 @media(max-width:1100px){.aim-top{padding:0 5px;font-size:11.5px}}
+/* Docked Tools panel: its own left column, like Illustrator */
+#dsTools.ai-toolbar.ai-docked{left:0!important;top:var(--ai-dock-top,74px)!important;bottom:0;max-height:none!important;border-width:0 1px 0 0;border-radius:0;box-shadow:none}
+#dsTools.ai-toolbar.ai-docked .ds-head{cursor:grab}
+body.ai-tools-docked .workspace{margin-left:var(--ai-dock-w,0px)}
+body.ai-tools-docked .stage-wrap{padding-left:34px!important}
+@media print{body.ai-tools-docked .workspace{margin-left:0}}
 </style>
 <script id="ee-illustrator-toolbar-runtime">
 window.addEventListener('DOMContentLoaded',()=>{
@@ -23033,6 +23040,40 @@ window.addEventListener('DOMContentLoaded',()=>{
  },true);
 
  setCols(store.get('eeCanvasAiCols','1')==='2'?2:1);
+
+ // ----- Docked tool column (Illustrator's default), or a floating panel -----
+ // Docked, the strip fills a left column and the workspace starts to its
+ // right, so it never covers the artboard or rulers. Dragging the grip tears
+ // it off; dropping it near the left edge or double-clicking the grip docks it.
+ const root=document.documentElement,grip=$('dsGrip');
+ function syncDock(){
+  const docked=strip.classList.contains('ai-docked')&&!strip.hidden;
+  document.body.classList.toggle('ai-tools-docked',docked);
+  const top=(workspace||document.querySelector('.workspace'))?.getBoundingClientRect().top??74;
+  root.style.setProperty('--ai-dock-top',Math.max(0,Math.round(top))+'px');
+  root.style.setProperty('--ai-dock-w',docked?strip.offsetWidth+'px':'0px');
+ }
+ function setDock(on){
+  strip.classList.toggle('ai-docked',on);
+  if(on){strip.style.left='';strip.style.top='';}
+  grip.title=on?'Drag to float the Tools panel':'Drag to move the Tools panel; drop at the left edge or double-click to dock';
+  store.set('eeCanvasAiDock',on?'1':'0');syncDock();
+  requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));
+ }
+ window.EECanvasDockTools=on=>setDock(on===undefined?!strip.classList.contains('ai-docked'):!!on);
+ window.EECanvasToolsDocked=()=>strip.classList.contains('ai-docked');
+ grip.addEventListener('pointerdown',e=>{
+  if(e.button!==0||e.target.closest('button'))return;
+  if(strip.classList.contains('ai-docked')){const r=strip.getBoundingClientRect();strip.style.left=r.left+6+'px';strip.style.top=r.top+'px';strip.classList.remove('ai-docked');store.set('eeCanvasAiDock','0');syncDock();}
+  const up=()=>{grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);if(strip.getBoundingClientRect().left<40)setDock(true);else syncDock();};
+  grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);
+ });
+ grip.addEventListener('dblclick',e=>{if(!e.target.closest('button'))setDock(!strip.classList.contains('ai-docked'));});
+ new ResizeObserver(syncDock).observe(strip);
+ const topbar=document.querySelector('.topbar');if(topbar)new ResizeObserver(syncDock).observe(topbar);
+ new MutationObserver(syncDock).observe(strip,{attributes:true,attributeFilter:['hidden','class']});
+ window.addEventListener('resize',syncDock);
+ setDock(store.get('eeCanvasAiDock','1')!=='0');
 });
 </script>
 </body>
