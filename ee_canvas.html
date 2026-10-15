@@ -15933,6 +15933,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
     const key = String(e.key || "").toLowerCase();
     const code = String(e.code || "");
 
+    if (!modalOpen && !teSession && aipHandleKey(e)) return;
     if (mod && key === "z") { e.preventDefault(); restoreHistory(state.historyIndex + (e.shiftKey ? 1 : -1)); return; }
     if (mod && key === "y") { e.preventDefault(); restoreHistory(state.historyIndex + 1); return; }
     if (mod && key === "c") { e.preventDefault(); copySelected(); return; }
@@ -20308,7 +20309,7 @@ function dsSetNodeMode(o,index,mode){
   const aipSvg=body=>`<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
   const aipIcon=(name)=>aipSvg(AIP_ICONS[name]||'');
   toolCursors.eyedropper=cursorIcon('M3 29 5 23 17 11 21 15 9 27Z M15 9 23 17 M19 13 25 7a3 3 0 0 0-4-4l-6 6',3,29,'crosshair');
-  const aipStore={load(){try{return JSON.parse(localStorage.getItem(AIP_STORE)||'{}')||{};}catch(_){return {};}},save(){try{localStorage.setItem(AIP_STORE,JSON.stringify({ref:aipUI.ref,link:aipUI.link,alignTo:aipUI.alignTo,collapsed:aipUI.collapsed}));}catch(_){}}};
+  const aipStore={load(){try{return JSON.parse(localStorage.getItem(AIP_STORE)||'{}')||{};}catch(_){return {};}},save(){try{localStorage.setItem(AIP_STORE,JSON.stringify({ref:aipUI.ref,link:aipUI.link,alignTo:aipUI.alignTo,collapsed:aipUI.collapsed,opts:aipUI.opts}));}catch(_){}}};
 
   function aipEditable(){return selectedObjects().filter(o=>!o.locked);}
   function aipCommit(){saveHistory();render();renderLayers();syncControls();}
@@ -20408,28 +20409,31 @@ function dsSetNodeMode(o,index,mode){
     if(tool){aipUI.switching=true;try{dsSetMode('select');}finally{aipUI.switching=false;}}
     aipUI.tool=tool||null;
     document.querySelectorAll('[data-aip-tool]').forEach(b=>{const on=b.dataset.aipTool===aipUI.tool;b.classList.toggle('ai-on',on);b.classList.toggle('is-active',on);b.setAttribute('aria-pressed',String(on));});
-    if(tool==='zoom')setStatus('Zoom: click to zoom in, Alt-click to zoom out, or drag a rectangle to zoom to that area. Double-click the Zoom tool for 100%.');
-    else if(tool==='eyedropper')setStatus('Eyedropper: click an object to apply its appearance to the selection (or to new drawings when nothing is selected). Alt-click applies the selection’s appearance to the clicked object.');
-    updateCursor();aipSync();
+    if(tool&&AIP_TOOL_HELP[tool])setStatus(AIP_TOOL_HELP[tool],7000);
+    if(tool!=='measure')aipUI.measure=null;
+    updateCursor();aipSync();aipDrawOverlay();
   }
   function aipToolCleared(){if(aipUI?.tool&&!aipUI.switching)aipSetTool(null);}
-  function aipCursor(){return aipUI.tool==='zoom'?(aipUI.alt?'zoom-out':'zoom-in'):toolCursors.eyedropper;}
+  function aipCursor(){const t=aipUI.tool;return t==='zoom'?(aipUI.alt?'zoom-out':'zoom-in'):t==='eyedropper'?toolCursors.eyedropper:t==='rotate'?toolCursors.rotate:t==='scale'?'nwse-resize':t==='carrier'?'cell':'crosshair';}
 
   function aipInstallInput(){
     window.addEventListener('pointerdown',e=>{
       if(!aipUI.tool||e.target!==canvas||e.button!==0||teSession)return;
       e.preventDefault();e.stopImmediatePropagation();
       if(aipUI.tool==='eyedropper'){const p=pointFromEvent(e);aipEyedrop(hitTest(p.x,p.y),e.altKey);return;}
+      if(aipUI.tool!=='zoom'){aipToolDown(e);return;}
       const box=document.createElement('div');box.className='aip-zoom-box';box.hidden=true;document.body.append(box);
       aipUI.zoomDrag={x:e.clientX,y:e.clientY,alt:e.altKey,box,id:e.pointerId};
       try{canvas.setPointerCapture(e.pointerId);}catch(_){}
     },true);
     window.addEventListener('pointermove',e=>{
+      if(aipUI.drag){if(aipToolMove(e)){e.preventDefault();e.stopImmediatePropagation();}return;}
       const d=aipUI.zoomDrag;if(!d||e.pointerId!==d.id)return;
       const w=Math.abs(e.clientX-d.x),h=Math.abs(e.clientY-d.y);d.box.hidden=w<5&&h<5;
       Object.assign(d.box.style,{left:Math.min(e.clientX,d.x)+'px',top:Math.min(e.clientY,d.y)+'px',width:w+'px',height:h+'px'});
     },true);
     const end=(e,cancel)=>{
+      if(aipUI.drag){if(aipToolUp(e,cancel)){e.preventDefault();e.stopImmediatePropagation();}return;}
       const d=aipUI.zoomDrag;if(!d||e.pointerId!==d.id)return;aipUI.zoomDrag=null;d.box.remove();
       e.preventDefault();e.stopImmediatePropagation();if(cancel)return;
       const w=Math.abs(e.clientX-d.x),h=Math.abs(e.clientY-d.y);
@@ -20449,9 +20453,7 @@ function dsSetNodeMode(o,index,mode){
     window.addEventListener('keydown',e=>{
       if(e.ctrlKey||e.metaKey||teSession||keyboardTargetIsEditable(e.target))return;
       const k=String(e.key||'').toLowerCase();
-      if(k==='z'&&!e.altKey&&!e.shiftKey){e.preventDefault();aipSetTool('zoom');}
-      else if(k==='i'&&!e.altKey&&!e.shiftKey){e.preventDefault();aipSetTool('eyedropper');}
-      else if(k==='escape'&&aipUI.tool)aipSetTool(null);
+      if(k==='escape'&&aipUI.tool)aipSetTool(null);
     },true);
     // Keep the panel numbers current after direct manipulation on the canvas.
     let raf=0;const later=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>aipSync());};
@@ -20464,7 +20466,7 @@ function dsSetNodeMode(o,index,mode){
   }
   function aipInit(){
     const panel=$('inspectorPanel');if(!panel)return;
-    Object.assign(aipUI,aipStore.load());aipUI.collapsed=aipUI.collapsed&&typeof aipUI.collapsed==='object'?aipUI.collapsed:{};
+    const stored=aipStore.load(),defaults={...aipUI.opts};Object.assign(aipUI,stored);aipUI.opts={...defaults,...(stored.opts&&typeof stored.opts==='object'?stored.opts:{})};aipUI.collapsed=aipUI.collapsed&&typeof aipUI.collapsed==='object'?aipUI.collapsed:{};
     if(!['nw','n','ne','w','c','e','sw','s','se'].includes(aipUI.ref))aipUI.ref='nw';
     const fontOptions=[...($('topFontFamily')?.options||[])].map(o=>`<option value="${escapeHtmlAttr(o.value)}">${escapeHtmlAttr(o.text)}</option>`).join('');
     const refs=['nw','n','ne','w','c','e','sw','s','se'].map(r=>`<button type="button" data-ref="${r}" role="radio" title="Reference point" aria-label="Reference point ${r.toUpperCase()}"><i></i></button>`).join('');
@@ -20473,7 +20475,7 @@ function dsSetNodeMode(o,index,mode){
     const root=document.createElement('div');root.id='aipRoot';root.className='aip';
     root.innerHTML=`<div class="aip-kind"><span class="aip-kind-icon" id="aipKindIcon"></span><strong id="aipKind">No Selection</strong><span class="aip-kind-sub" id="aipKindSub"></span></div>
     <div id="aipAnchorSlot"></div>
-    ${aipSection('aipToolOptions','Tool Options','<div id="aipToolOptionsBody"></div><p class="aip-note" id="aipToolHint"></p>')}
+    ${aipSection('aipToolOptions','Tool Options','<div id="aipToolOptionsBody"></div><div id="aipToolOptsExtra"></div><p class="aip-note" id="aipToolHint"></p>')}
     ${aipSection('aipTransform','Transform',`<div class="aip-tf"><div class="aip-ref" role="radiogroup" aria-label="Reference point">${refs}</div>
       <div class="aip-xywh">${field('aipX','X:')}${field('aipY','Y:')}${field('aipW','W:','min="1"')}${field('aipH','H:','min="1"')}
       <button type="button" class="aip-link" id="aipLink" title="Constrain width and height proportions" aria-label="Constrain width and height proportions">${aipIcon('link')}</button></div></div>
@@ -20495,6 +20497,7 @@ function dsSetNodeMode(o,index,mode){
     ${aipSection('aipDocument','Document',`<div class="aip-row"><label class="aip-f"><span>Units:</span><select disabled><option>Pixels</option></select></label></div>
       <div class="aip-sub">Artboard</div><div class="aip-xywh aip-xywh-2">${field('aipArtW','W:','min="200" max="5000"')}${field('aipArtH','H:','min="200" max="5000"')}</div>
       <div class="aip-row"><label class="aip-f"><span>Background:</span><input id="aipBg" type="color" aria-label="Artboard background color"></label></div>
+      <div class="aip-row"><span class="aip-f"><span>Scale:</span></span><span id="aipScaleText"></span><button type="button" class="aip-link-btn" id="aipScaleBtn">Change…</button></div>
       <div class="aip-row aip-actions"><button type="button" id="aipDocSetup" title="Journal figure size, typography, and line-weight rules">Journal Setup…</button><button type="button" id="aipFitArt">Fit Artboard</button></div>`)}
     ${aipSection('aipRulers','Rulers & Grids',`<div class="aip-checks"><label><input type="checkbox" id="aipRulersOn"> Rulers</label><label><input type="checkbox" id="aipGridOn"> Grid</label><label><input type="checkbox" id="aipSnapOn"> Snap to Grid</label><label><input type="checkbox" id="aipGuidesOn"> Guides</label><label><input type="checkbox" id="aipSnapGuidesOn"> Snap to Guides</label><label><input type="checkbox" id="aipLockGuidesOn"> Lock Guides</label></div>
       <div class="aip-row"><label class="aip-f"><span>Gridline every:</span><input id="aipGridSize" type="number" min="5" max="200" step="1"></label><span class="aip-unit">px</span></div>`)}
@@ -20562,6 +20565,7 @@ function dsSetNodeMode(o,index,mode){
     on('aipSnapOn','change',e=>{state.snapGrid=e.target.checked;syncGridControls();saveHistory();render();dsRefresh();});
     on('aipGridSize','change',e=>{state.gridSize=clamp(aipNum(e.target.value,20),5,200);syncGridControls();saveHistory();render();dsRefresh();});
     for(const [id,key] of [['aipRulersOn','rulers'],['aipGuidesOn','showGuides'],['aipSnapGuidesOn','snapGuides'],['aipLockGuidesOn','locked']])on(id,'change',e=>{state.studioDesign[key]=e.target.checked;saveHistory();render();dsGuideList();dsRefresh();});
+    on('aipScaleBtn','click',()=>aipScaleDialog());
     on('aipQuickBody','click',e=>{const b=e.target.closest('[data-qa]');if(b)aipQuick(b.dataset.qa);});
   }
 
@@ -20604,9 +20608,13 @@ function dsSetNodeMode(o,index,mode){
     else if(n>1){const gs=new Set(objs.map(o=>o.groupId||null));if(gs.size===1&&objs[0].groupId){kind='Group';icon='group';}else{kind='Mixed Objects';icon='multi';}sub=`${n} objects${objs.some(o=>o.locked)?' · some locked':''}`;}
     $('aipKind').textContent=kind;$('aipKindSub').textContent=sub;$('aipKindIcon').innerHTML=aipSvg(AIP_ICONS.kind[icon]);
     const textObjs=objs.filter(o=>AIP_TEXT_TYPES.has(o.type));
-    const toolOpts=$('aipToolOptionsBody'),creating=!n&&state.tool==='bezier'&&!!toolOpts?.children.length;
-    show('aipToolOptions',creating);
-    if(creating)$('aipToolHint').textContent='Pen: click to place corner points, drag to pull out smooth handles. Enter finishes; Esc cancels.';
+    const toolOpts=$('aipToolOptionsBody'),pen=!aipUI.tool&&!n&&state.tool==='bezier'&&!!toolOpts?.children.length,extra=$('aipToolOptsExtra');
+    if(extra&&extra.dataset.tool!==(aipUI.tool||'')){extra.dataset.tool=aipUI.tool||'';extra.innerHTML=aipUI.tool?aipToolOptionsHtml():'';aipBindToolOptions(extra);}
+    show('aipToolOptions',pen||!!aipUI.tool);toolOpts.hidden=!pen;
+    $('aipToolOptions').querySelector('.aip-sec-head span').textContent=aipUI.tool?(({eyedropper:'Eyedropper',zoom:'Zoom',rotate:'Rotate',scale:'Scale',measure:'Measure',carrier:'Carrier',level:'Energy Level',dimension:'Dimension'})[aipUI.tool]+' Tool'):'Pen Tool';
+    $('aipToolHint').textContent=pen?'Click to place corner points, drag to pull out smooth handles. Enter finishes; Esc cancels.':aipUI.tool?AIP_TOOL_HELP[aipUI.tool].replace(/^[^:]+:\s*(.)/,(m,c)=>c.toUpperCase()):'';
+    const pivotKey=state.selectedIds.join(',');if(pivotKey!==aipUI.pivotKey){aipUI.pivotKey=pivotKey;aipUI.pivot=null;}
+    if(aipUI.tool)aipDrawOverlay();
     show('aipTransform',n>0);show('aipAppearance',n>0);show('aipAlign',n>0);
     show('aipCharacter',textObjs.length>0||(!n&&!!teArmedKind));
     show('aipImage',single?.type==='image');
@@ -20646,7 +20654,7 @@ function dsSetNodeMode(o,index,mode){
       $('aipUnderline').classList.toggle('is-on',t?!!t.underline:!!textDefaults.underline);
     }
     if(!n){
-      set('aipArtW',canvas.width);set('aipArtH',canvas.height);set('aipBg',colorHex(state.background||'#ffffff'));
+      set('aipArtW',canvas.width);set('aipArtH',canvas.height);{const sc=aipScale();$('aipScaleText').textContent=`${sc.px} px = ${sc.value} ${sc.unit}`;}set('aipBg',colorHex(state.background||'#ffffff'));
       const sd=state.studioDesign||{};
       const chk=(id,v)=>{const el=$(id);if(el)el.checked=!!v;};
       chk('aipRulersOn',sd.rulers);chk('aipGuidesOn',sd.showGuides);chk('aipSnapGuidesOn',sd.snapGuides);chk('aipLockGuidesOn',sd.locked);
@@ -20658,7 +20666,7 @@ function dsSetNodeMode(o,index,mode){
 
   function aipAddToolButtons(){
     const tools=document.querySelector('#dsTools .ds-tools');if(!tools)return;
-    for(const [tool,title] of [['eyedropper','Eyedropper Tool (I)'],['zoom','Zoom Tool (Z)']]){
+    for(const [tool,title] of [['eyedropper','Eyedropper Tool (I)'],['zoom','Zoom Tool (Z)'],['rotate','Rotate Tool (Shift+R)'],['scale','Scale Tool (S)'],['measure','Measure Tool (Shift+M)'],['carrier','Carrier Tool (Shift+C)'],['level','Energy Level Tool (Shift+L)'],['dimension','Dimension Tool (Shift+D)']]){
       const b=document.createElement('button');b.type='button';b.dataset.aipTool=tool;b.title=title;b.setAttribute('aria-label',title);b.setAttribute('aria-pressed','false');b.innerHTML=aipIcon(tool);
       b.addEventListener('click',()=>aipSetTool(aipUI.tool===tool&&tool!=='zoom'?null:tool));
       if(tool==='zoom')b.addEventListener('dblclick',()=>{setZoom(1);aipSetTool(null);setStatus('Zoom 100%.');});
@@ -20666,10 +20674,465 @@ function dsSetNodeMode(o,index,mode){
     }
   }
 
+  // ===== 7. More Illustrator tools, solid-state tools, and the menu bar =====
+  const AIP_TOOL_HELP={
+    zoom:'Zoom: click to zoom in, Alt-click to zoom out, or drag a rectangle to zoom to that area. Double-click the Zoom tool for 100%.',
+    eyedropper:'Eyedropper: click an object to apply its appearance to the selection (or to new drawings when nothing is selected). Alt-click applies the selection’s appearance to the clicked object.',
+    rotate:'Rotate: drag to rotate the selection around its origin point (Shift snaps to 45°). Click once to move the origin; Alt-click opens the Rotate dialog.',
+    scale:'Scale: drag to scale the selection from its origin point (Shift keeps proportions). Click once to move the origin; Alt-click opens the Scale dialog.',
+    measure:'Measure: drag between two points to read distance, ΔX, ΔY, and angle in pixels and in the drawing scale (Shift snaps to 45°).',
+    carrier:'Carrier: click to place an electron, Alt-click for a hole; drag to spray a row of carriers. Choose the carrier kind and size in Tool Options.',
+    level:'Energy level: drag horizontally to draw a labeled band edge or Fermi level (E_c, E_v, E_F, E_i, E_vac, quasi-Fermi). Click for a default-width level.',
+    dimension:'Dimension: drag between two points to insert a dimension with arrowheads, extension ticks, and a length label in the drawing scale (Shift snaps to 45°).'
+  };
+  const AIP_LEVELS={
+    Ec:{label:'E_c',stroke:'#1d4ed8',dash:[]},Ev:{label:'E_v',stroke:'#b91c1c',dash:[]},
+    EF:{label:'E_F',stroke:'#111827',dash:[10,7]},Ei:{label:'E_i',stroke:'#6b7280',dash:[2,5]},
+    Evac:{label:'E_{vac}',stroke:'#6b7280',dash:[2,5,10,5]},EFn:{label:'E_{Fn}',stroke:'#1d4ed8',dash:[10,7]},
+    EFp:{label:'E_{Fp}',stroke:'#b91c1c',dash:[10,7]},custom:{label:'E',stroke:'#111827',dash:[]}
+  };
+  const AIP_UNITS=['nm','µm','mm','Å','px'];
+  aipUI.opts={carrier:'electron',carrierStyle:'dot',carrierSize:14,level:'EF',levelLabel:'',levelLabelOn:true,dimDecimals:2};
+  aipUI.measure=null;aipUI.pivot=null;aipUI.pivotKey='';aipUI.drag=null;
+
+  function aipScale(){const s=state.studioDesign?.scale;return s&&s.px>0&&s.value>0&&AIP_UNITS.includes(s.unit)?s:{px:100,value:1,unit:'µm'};}
+  function aipFormatLen(px,decimals=aipUI.opts.dimDecimals){
+    const s=aipScale();if(s.unit==='px')return `${aipRound(px)} px`;
+    const v=px*s.value/s.px;return `${Number(v.toFixed(clamp(decimals|0,0,4)))} ${s.unit}`;
+  }
+  function aipConstrain(a,b,shift){
+    if(!shift)return b;const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy),ang=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4);
+    return {x:a.x+Math.cos(ang)*len,y:a.y+Math.sin(ang)*len};
+  }
+  function aipAddObjects(objs,label){
+    const g=objs.length>1?gid():null;
+    for(const o of objs){o.id=uid();if(g){o.groupId=g;o.groupLabel=label;}if(!o.name)o.name=label;state.objects.push(o);}
+    return objs.map(o=>o.id);
+  }
+
+  // ----- Overlay for origin point, measure line, and creation previews -----
+  function aipOverlay(){
+    let svg=$('aipOverlay');
+    if(!svg){svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='aipOverlay';svg.setAttribute('aria-hidden','true');svg.setAttribute('preserveAspectRatio','none');shell.append(svg);}
+    svg.setAttribute('viewBox',`0 0 ${canvas.width} ${canvas.height}`);return svg;
+  }
+  function aipDrawOverlay(){
+    const svg=aipOverlay(),parts=[],k=1/Math.max(.15,state.zoom);
+    const pv=aipPivotPoint();
+    if(pv&&['rotate','scale'].includes(aipUI.tool)){const r=7*k;parts.push(`<g class="aip-ov-pivot"><circle cx="${pv.x}" cy="${pv.y}" r="${r}"/><path d="M${pv.x-r*1.8} ${pv.y}H${pv.x+r*1.8}M${pv.x} ${pv.y-r*1.8}V${pv.y+r*1.8}"/></g>`);}
+    const m=aipUI.measure;
+    if(m&&aipUI.tool==='measure'){const r=3.5*k;parts.push(`<g class="aip-ov-measure"><path d="M${m.a.x} ${m.a.y}L${m.b.x} ${m.b.y}"/><circle cx="${m.a.x}" cy="${m.a.y}" r="${r}"/><circle cx="${m.b.x}" cy="${m.b.y}" r="${r}"/><text x="${(m.a.x+m.b.x)/2+8*k}" y="${(m.a.y+m.b.y)/2-8*k}" style="font-size:${12*k}px">${escapeHtmlAttr(aipFormatLen(Math.hypot(m.b.x-m.a.x,m.b.y-m.a.y)))}</text></g>`);}
+    const d=aipUI.drag;
+    if(d?.preview)parts.push(`<path class="aip-ov-preview" d="M${d.preview.a.x} ${d.preview.a.y}L${d.preview.b.x} ${d.preview.b.y}"/>`);
+    svg.innerHTML=parts.join('');svg.style.setProperty('--k',k);
+  }
+  function aipPivotPoint(){
+    if(!['rotate','scale'].includes(aipUI.tool)||!state.selectedIds.length)return null;
+    if(aipUI.pivot)return aipUI.pivot;const b=aipBounds();return b?{x:b.x+b.w/2,y:b.y+b.h/2}:null;
+  }
+
+  // ----- Rotate / Scale tools ------------------------------------------------
+  function aipTransformFromStarts(d,p,shift){
+    const pv=d.pivot;
+    if(d.tool==='rotate'){
+      let delta=(Math.atan2(p.y-pv.y,p.x-pv.x)-Math.atan2(d.start.y-pv.y,d.start.x-pv.x))*180/Math.PI;
+      if(shift)delta=Math.round(delta/45)*45;
+      d.objs.forEach((o,i)=>{const s=d.starts[i],c=boundsCenter(baseBounds(s)),n=rotatePoint(c,delta,pv);moveObjectFrom(o,s,n.x-c.x,n.y-c.y);o.rotation=(((s.rotation||0)+delta)%360+360)%360;});
+      setStatus(`Rotate ${aipRound(delta)}°`,1200);
+    }else{
+      const f=(cur,st,pc)=>Math.abs(st-pc)<4?1:(cur-pc)/(st-pc);
+      let sx=f(p.x,d.start.x,pv.x),sy=f(p.y,d.start.y,pv.y);
+      if(shift){const u=Math.abs(sx)>Math.abs(sy)?sx:sy;sx=sy=u;}
+      sx=Math.max(.02,Math.abs(sx));sy=Math.max(.02,Math.abs(sy));
+      d.objs.forEach((o,i)=>{const s=d.starts[i],ob=baseBounds(s);scaleObjectToBounds(o,s,ob,{x:pv.x+(ob.x-pv.x)*sx,y:pv.y+(ob.y-pv.y)*sy,w:Math.max(1,ob.w*sx),h:Math.max(1,ob.h*sy)});});
+      setStatus(`Scale ${Math.round(sx*100)}% × ${Math.round(sy*100)}%`,1200);
+    }
+    render();
+  }
+
+  // ----- Solid-state creation tools -------------------------------------------------
+  function aipCarrierObjects(p,kind){
+    const s=clamp(aipNum(aipUI.opts.carrierSize,14),6,60),x=p.x-s/2,y=p.y-s/2;
+    const blue='#1d4ed8',red='#b91c1c';
+    const sign=(t,color)=>TX(x,y,t,{w:s,h:s,fontSize:Math.max(8,s*.95),fill:color,textAlign:'center',textVAlign:'middle',autoFit:false,textPaddingX:0,textPaddingY:0,fontFamily:'Arial',bold:true});
+    if(kind==='donor')return [R(x,y,s,s,{fill:'#ffffff',stroke:blue,strokeWidth:1.4}),sign('+',blue)];
+    if(kind==='acceptor')return [R(x,y,s,s,{fill:'#ffffff',stroke:red,strokeWidth:1.4}),sign('−',red)];
+    const hole=kind==='hole';
+    if(aipUI.opts.carrierStyle==='sign')return [EL(x,y,s,s,{fill:hole?'#fee2e2':'#dbeafe',stroke:hole?red:blue,strokeWidth:1.6}),sign(hole?'+':'−',hole?red:blue)];
+    return [EL(x,y,s,s,hole?{fill:'#ffffff',stroke:red,strokeWidth:1.8}:{fill:blue,stroke:'#1e3a8a',strokeWidth:1})];
+  }
+  const AIP_CARRIER_NAMES={electron:'Electron',hole:'Hole',donor:'Ionized donor',acceptor:'Ionized acceptor'};
+  function aipPlaceCarrier(d,p){
+    const kind=d.alt?(aipUI.opts.carrier==='hole'?'electron':'hole'):aipUI.opts.carrier;
+    d.created.push(...aipAddObjects(aipCarrierObjects(p,kind),AIP_CARRIER_NAMES[kind]));d.lastPlaced=p;render();
+  }
+  function aipCreateLevel(a,b){
+    const spec=AIP_LEVELS[aipUI.opts.level]||AIP_LEVELS.EF;
+    let x1=Math.min(a.x,b.x),x2=Math.max(a.x,b.x);if(x2-x1<10){x1=a.x;x2=a.x+240;}
+    const y=a.y,objs=[LN(x1,y,x2,y,{stroke:spec.stroke,strokeWidth:2,dash:spec.dash.slice(),lineCap:'butt'})];
+    const label=(aipUI.opts.level==='custom'?aipUI.opts.levelLabel:'')||spec.label;
+    if(aipUI.opts.levelLabelOn)objs.push(TX(x2+4,y-13,label,{w:70,h:26,fontSize:16,fill:spec.stroke,textAlign:'left',textVAlign:'middle'}));
+    return aipAddObjects(objs,label.replace(/[_{}]/g,'')+' level');
+  }
+  function aipCreateDimension(a,b){
+    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);if(len<6)return [];
+    const n={x:-dy/len,y:dx/len},ext=9,col='#b45309',label=aipFormatLen(len);
+    let deg=Math.atan2(dy,dx)*180/Math.PI;if(deg>90)deg-=180;if(deg<=-90)deg+=180;
+    const up=deg===Math.atan2(dy,dx)*180/Math.PI?-1:1,c={x:(a.x+b.x)/2+n.x*16*up,y:(a.y+b.y)/2+n.y*16*up};
+    return aipAddObjects([
+      AR(a.x,a.y,b.x,b.y,{arrowKind:'both',stroke:col,strokeWidth:1.4}),
+      LN(a.x-n.x*ext,a.y-n.y*ext,a.x+n.x*ext,a.y+n.y*ext,{stroke:col,strokeWidth:1.2}),
+      LN(b.x-n.x*ext,b.y-n.y*ext,b.x+n.x*ext,b.y+n.y*ext,{stroke:col,strokeWidth:1.2}),
+      TX(c.x-70,c.y-12,label,{w:140,h:24,fontSize:14,fill:col,textAlign:'center',textVAlign:'middle',rotation:Math.round(deg*10)/10})
+    ],'Dimension '+label);
+  }
+
+  function aipToolDown(e){
+    const t=aipUI.tool,p=pointFromEvent(e);
+    if(['rotate','scale'].includes(t)){
+      if(!aipEditable().length){setStatus(`Select objects before using the ${t==='rotate'?'Rotate':'Scale'} tool.`);return;}
+      if(e.altKey){aipUI.pivot=p;aipDrawOverlay();aipTransformDialog(t);return;}
+    }
+    aipUI.drag={tool:t,id:e.pointerId,start:p,last:p,moved:false,alt:e.altKey,created:[],preview:null};
+    if(t==='carrier')aipPlaceCarrier(aipUI.drag,p);
+    try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+  }
+  function aipToolMove(e){
+    const d=aipUI.drag;if(!d||e.pointerId!==d.id)return false;
+    const raw=pointFromEvent(e),p=d.tool==='level'?{x:raw.x,y:d.start.y}:['measure','dimension'].includes(d.tool)?aipConstrain(d.start,raw,e.shiftKey):raw;
+    if(!d.moved&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)<3)return true;
+    if(!d.moved&&['rotate','scale'].includes(d.tool)){d.objs=aipEditable();d.starts=d.objs.map(o=>deepClone(o));d.pivot=aipPivotPoint();}
+    d.moved=true;d.last=p;
+    if(['rotate','scale'].includes(d.tool))aipTransformFromStarts(d,p,e.shiftKey);
+    else if(d.tool==='measure'){aipUI.measure={a:d.start,b:p};aipMeasureReadout();}
+    else if(d.tool==='carrier'){const s=clamp(aipNum(aipUI.opts.carrierSize,14),6,60);if(Math.hypot(p.x-d.lastPlaced.x,p.y-d.lastPlaced.y)>=s*1.6)aipPlaceCarrier(d,p);}
+    else if(['level','dimension'].includes(d.tool)){d.preview={a:d.start,b:p};if(d.tool==='dimension')setStatus(`Dimension ${aipFormatLen(Math.hypot(p.x-d.start.x,p.y-d.start.y))}`,1200);}
+    aipDrawOverlay();return true;
+  }
+  function aipToolUp(e,cancel){
+    const d=aipUI.drag;if(!d||e.pointerId!==d.id)return false;aipUI.drag=null;
+    if(cancel){if(d.starts)d.objs.forEach((o,i)=>Object.assign(o,d.starts[i]));render();aipDrawOverlay();return true;}
+    if(['rotate','scale'].includes(d.tool)){
+      if(d.moved){saveHistory();renderLayers();syncControls();}
+      else{aipUI.pivot=d.start;setStatus('Origin point set. Drag to '+(d.tool==='rotate'?'rotate':'scale')+' around it.');}
+    }else if(d.tool==='carrier'){if(d.created.length){saveHistory();renderLayers();syncControls();}}
+    else if(d.tool==='level'){const ids=aipCreateLevel(d.start,d.moved?d.last:d.start);state.selectedIds=ids;saveHistory();render();renderLayers();syncControls();}
+    else if(d.tool==='dimension'&&d.moved){const ids=aipCreateDimension(d.start,d.last);if(ids.length){state.selectedIds=ids;saveHistory();render();renderLayers();syncControls();}}
+    aipDrawOverlay();return true;
+  }
+  function aipMeasureReadout(){
+    const m=aipUI.measure,el=$('aipMeasureOut');if(!m)return;
+    const dx=m.b.x-m.a.x,dy=m.b.y-m.a.y,dist=Math.hypot(dx,dy),ang=-Math.atan2(dy,dx)*180/Math.PI;
+    const text=`D: ${aipRound(dist)} px (${aipFormatLen(dist,3)})  ·  ΔX: ${aipRound(dx)}  ΔY: ${aipRound(dy)}  ·  ∠ ${aipRound(ang)}°`;
+    if(el)el.textContent=text;setStatus('Measure — '+text,6000);
+  }
+
+  // ----- Transform dialogs (Object ▸ Transform) ---------------------------------
+  function aipTransformDialog(kind){
+    if(!aipEditable().length){setStatus('Select objects first.');return;}
+    if(kind==='move')openBuilder('Move',[{k:'dx',label:'Horizontal',value:0,step:'any',unit:'px'},{k:'dy',label:'Vertical',value:0,step:'any',unit:'px'},{k:'copy',label:'Copy',type:'check',value:false,help:'Move a duplicate and leave the original in place.'}],v=>{if(v.copy)duplicateSelected();const sel=aipEditable();sel.forEach(o=>moveObjectFrom(o,deepClone(o),v.dx||0,v.dy||0));aipCommit();},{intro:'Move the selection by an exact distance. Positive values move right and down.',applyLabel:'OK'});
+    else if(kind==='rotate')openBuilder('Rotate',[{k:'angle',label:'Angle',value:90,step:'any',unit:'°',help:'Positive angles rotate clockwise on the canvas.'},{k:'copy',label:'Copy',type:'check',value:false,help:'Rotate a duplicate and leave the original in place.'}],v=>{if(v.copy)duplicateSelected();aipRotateAround(v.angle||0);aipCommit();},{intro:'Rotate the selection around its origin point (the selection center unless you set one with the Rotate tool).',applyLabel:'OK'});
+    else if(kind==='scale')openBuilder('Scale',[{k:'sx',label:'Horizontal',value:100,step:'any',unit:'%'},{k:'sy',label:'Vertical',value:100,step:'any',unit:'%'},{k:'uniform',label:'Uniform',type:'check',value:true,help:'Use the horizontal value for both directions.'},{k:'copy',label:'Copy',type:'check',value:false,help:'Scale a duplicate and leave the original in place.'}],v=>{if(v.copy)duplicateSelected();const sx=Math.max(1,v.sx||100)/100,sy=v.uniform?sx:Math.max(1,v.sy||100)/100;aipScaleAround(sx,sy);aipCommit();},{intro:'Scale the selection around its origin point.',applyLabel:'OK'});
+  }
+  function aipOrigin(){const b=aipBounds();return aipUI.pivot||(b?{x:b.x+b.w/2,y:b.y+b.h/2}:{x:0,y:0});}
+  function aipRotateAround(delta){const pv=aipOrigin();for(const o of aipEditable()){const c=boundsCenter(baseBounds(o)),n=rotatePoint(c,delta,pv);moveObjectFrom(o,deepClone(o),n.x-c.x,n.y-c.y);o.rotation=(((o.rotation||0)+delta)%360+360)%360;}}
+  function aipScaleAround(sx,sy){const pv=aipOrigin();for(const o of aipEditable()){const ob=baseBounds(o);scaleObjectToBounds(o,deepClone(o),ob,{x:pv.x+(ob.x-pv.x)*sx,y:pv.y+(ob.y-pv.y)*sy,w:Math.max(1,ob.w*sx),h:Math.max(1,ob.h*sy)});}}
+  function aipScaleDialog(){
+    const s=aipScale();
+    openBuilder('Drawing Scale',[{type:'info',text:'Sets how canvas pixels map to physical length. The Measure and Dimension tools and Insert Scale Bar use it.'},{k:'px',label:'Canvas length',value:s.px,min:1,step:'any',unit:'px'},{k:'value',label:'Equals',value:s.value,min:0,step:'any'},{k:'unit',label:'Unit',type:'select',value:s.unit,options:AIP_UNITS.map(u=>[u,u])}],v=>{state.studioDesign.scale={px:Math.max(1,v.px||100),value:v.value>0?v.value:1,unit:AIP_UNITS.includes(v.unit)?v.unit:'µm'};saveHistory();aipSync();aipDrawOverlay();setStatus(`Drawing scale: ${state.studioDesign.scale.px} px = ${state.studioDesign.scale.value} ${state.studioDesign.scale.unit}.`);},{intro:'Define the physical scale of the drawing.',applyLabel:'OK'});
+  }
+  function aipInsertScaleBar(){
+    const s=aipScale(),len=s.unit==='px'?100:s.px,label=s.unit==='px'?'100 px':`${s.value} ${s.unit}`;
+    placeGroup([R(0,0,len,6,{fill:INK,strokeWidth:0}),TX(len/2-60,10,label,{fontSize:13,w:120,textAlign:'center'})],'Scale bar');
+  }
+
+  // ----- Select, arrange, lock/hide, colors, artboard ------------------------------------
+  function aipSelect(ids){state.selectedIds=ids;activeEditPointSelection=null;render();renderLayers();syncControls();}
+  const aipVisible=()=>state.objects.filter(o=>o.visible!==false);
+  function aipSelectSame(key){
+    const ref=selectedObject()||selectedObjects()[0];if(!ref){setStatus('Select an object to match.');return;}
+    const same={fill:o=>(o.fill||null)===(ref.fill||null),stroke:o=>(o.stroke||null)===(ref.stroke||null),fillStroke:o=>(o.fill||null)===(ref.fill||null)&&(o.stroke||null)===(ref.stroke||null),
+      weight:o=>(o.strokeWidth??0)===(ref.strokeWidth??0),opacity:o=>(o.opacity??1)===(ref.opacity??1),type:o=>o.type===ref.type,hatch:o=>(o.hatch||'none')===(ref.hatch||'none')&&(o.fill||null)===(ref.fill||null)}[key];
+    const ids=aipVisible().filter(o=>!o.locked&&same(o)).map(o=>o.id);aipSelect(ids);setStatus(`${ids.length} matching object(s) selected.`);
+  }
+  function aipSelectStep(dir){
+    const vis=aipVisible(),cur=selectedObjects();if(!vis.length)return;
+    let i=cur.length?state.objects.indexOf(dir>0?cur.at(-1):cur[0]):(dir>0?-1:state.objects.length);
+    for(i+=dir;i>=0&&i<state.objects.length;i+=dir){const o=state.objects[i];if(o.visible!==false){aipSelect([o.id]);return;}}
+  }
+  function aipLock(on){
+    if(on){const objs=selectedObjects();if(!objs.length)return;objs.forEach(o=>o.locked=true);state.selectedIds=[];}
+    else state.objects.forEach(o=>o.locked=false);
+    aipCommit();setStatus(on?'Selection locked. Object ▸ Unlock All (Alt+Ctrl+2) releases it.':'All objects unlocked.');
+  }
+  function aipHide(on){
+    if(on){const objs=selectedObjects();if(!objs.length)return;objs.forEach(o=>o.visible=false);state.selectedIds=[];}
+    else{const hidden=state.objects.filter(o=>o.visible===false);hidden.forEach(o=>o.visible=true);state.selectedIds=hidden.map(o=>o.id);}
+    aipCommit();
+  }
+  async function aipRecolor(fn,label){
+    const objs=aipEditable();if(!objs.length){setStatus('Select objects to recolor.');return;}
+    const conv=c=>{if(!c||typeof c!=='string'||c==='none'||c==='transparent')return c;const h=colorHex(c),r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);const [R2,G2,B2]=fn(r,g,b).map(v=>clamp(Math.round(v),0,255));return '#'+[R2,G2,B2].map(v=>v.toString(16).padStart(2,'0')).join('');};
+    objs.forEach(o=>{o.fill=conv(o.fill);o.stroke=conv(o.stroke);if(o.hatchColor)o.hatchColor=conv(o.hatchColor);});
+    if(objs.some(o=>o.type==='equation')){try{await refreshSelectedEquations();}catch(err){console.error(err);}}
+    aipCommit();setStatus(label);
+  }
+  function aipFitArtboard(selectedOnly){
+    const objs=(selectedOnly?selectedObjects():aipVisible());if(!objs.length){setStatus(selectedOnly?'Select artwork first.':'The canvas is empty.');return;}
+    const b=unionBounds(objs),m=20,dx=Math.round(m-b.x),dy=Math.round(m-b.y);
+    state.objects.forEach(o=>offsetObject(o,dx,dy));
+    if(Array.isArray(state.studioDesign?.guides))state.studioDesign.guides.forEach(g=>{g.value+=g.axis==='x'?dx:dy;});
+    canvas.width=clamp(Math.ceil(b.w+2*m),200,5000);canvas.height=clamp(Math.ceil(b.h+2*m),200,5000);
+    applyZoom();saveHistory();render();renderLayers();syncControls();setStatus(`Artboard fitted: ${canvas.width} × ${canvas.height} px.`);
+  }
+  function aipPaste(mode){
+    if(!state.clipboard.length){setStatus('Nothing to paste.');return;}
+    pasteClipboard();const pasted=selectedObjects();pasted.forEach(o=>offsetObject(o,-24,-24));
+    if(mode==='back'){const ids=state.selectedIds;state.objects=[...state.objects.filter(o=>ids.includes(o.id)),...state.objects.filter(o=>!ids.includes(o.id))];}
+    saveHistory();render();renderLayers();syncControls();
+  }
+  function aipCut(){if(!selectedObjects().length)return;copySelected();deleteSelected();setStatus('Cut to the EE Canvas clipboard.');}
+  function aipShadow(on){const objs=aipEditable();objs.forEach(o=>{o.shadow={...(o.shadow||{blur:12,color:'#000000',x:4,y:6}),enabled:on};});if(objs.length)aipCommit();}
+  function aipApplyMaterial(key){
+    const m=MAT[key];if(!m)return;const objs=aipEditable().filter(o=>['rect','ellipse','triangle','star'].includes(o.type)||(o.type==='path'&&o.closed));
+    if(!objs.length){setStatus('Select closed shapes to apply a material.');return;}
+    objs.forEach(o=>{o.fill=m.fill;o.hatch=m.hatch;});aipCommit();
+  }
+  function aipSetHatch(kind){const objs=aipEditable().filter(o=>['rect','ellipse','triangle','star'].includes(o.type));if(!objs.length){setStatus('Select shapes to apply a hatch.');return;}objs.forEach(o=>o.hatch=kind);aipCommit();}
+  function aipTextSet(fn){const objs=aipEditable().filter(o=>o.type==='text');if(!objs.length){setStatus('Select a text object.');return;}objs.forEach(fn);aipCommit();}
+  function aipShowPanel(tab){
+    const ws=document.querySelector('.workspace');if(ws&&!ws.classList.contains('panel-open'))$('panelToggleBtn')?.click();
+    document.querySelector(`.rightbar .tab[data-panel="${tab}"]`)?.click();
+  }
+
+  // ----- Menu bar ------------------------------------------------------------------
+  const AIP_MAT_NAMES={metal:'Metal',poly:'Poly-Si',oxide:'Oxide (SiO₂)',nitride:'Nitride (Si₃N₄)',ntype:'n-type',ptype:'p-type',nplus:'n⁺',pplus:'p⁺',intr:'Intrinsic',sub:'Substrate',depl:'Depletion region'};
+  const AIP_HATCH_NAMES={none:'No hatch',oxide:'Oxide ///',metal:'Metal ###',poly:'Poly |||',ntype:'n dots',ptype:'p cross',nitride:'Nitride',substrate:'Substrate \\\\\\'};
+  const AIP_GLYPHS=['α','β','γ','δ','ε','θ','λ','μ','ν','ρ','σ','τ','φ','χ','ψ','ω','Γ','Δ','Φ','Ψ','Ω','∇','∂','±','≈','≠','≤','≥','∝','∞','→','⇌','°','Å','ħ','⊥','∥'];
+  const AIP_SCI=['E_c','E_v','E_F','E_i','E_g','E_{vac}','N_A^-','N_D^+','n_i','\\mu_n','\\mu_p','V_{bi}','V_T','x_d','\\phi_m','\\chi','q\\phi_B','J_n','J_p','\\epsilon_s'];
+  function aimMenus(){
+    const n=state.selectedIds.length,sel=n>0,single=selectedObject(),objs=selectedObjects(),sd=state.studioDesign||{};
+    const hasText=objs.some(o=>o.type==='text'),hasClip=state.clipboard.length>0,ws=document.querySelector('.workspace');
+    const tool=(id,l,k)=>({l,k,f:()=>aipSetTool(id),c:aipUI.tool===id});
+    const shapes=objs.some(o=>['rect','ellipse','triangle','star'].includes(o.type));
+    const click=id=>()=>$(id)?.click();
+    return {
+      Edit:[
+        {l:'Undo',k:'Ctrl+Z',f:()=>restoreHistory(state.historyIndex-1),d:state.historyIndex<=0},
+        {l:'Redo',k:'Shift+Ctrl+Z',f:()=>restoreHistory(state.historyIndex+1),d:state.historyIndex>=state.history.length-1},'-',
+        {l:'Cut',k:'Ctrl+X',f:aipCut,d:!sel},{l:'Copy',k:'Ctrl+C',f:copySelected,d:!sel},
+        {l:'Paste',k:'Ctrl+V',f:pasteClipboard,d:!hasClip},{l:'Paste in Front',k:'Ctrl+F',f:()=>aipPaste('front'),d:!hasClip},
+        {l:'Paste in Back',k:'Ctrl+B',f:()=>aipPaste('back'),d:!hasClip},{l:'Paste in Place',k:'Shift+Ctrl+V',f:()=>aipPaste('place'),d:!hasClip},
+        {l:'Duplicate',k:'Ctrl+D',f:duplicateSelected,d:!sel},{l:'Clear',k:'Del',f:()=>deleteSelected(),d:!sel},'-',
+        {l:'Edit Colors',sub:[
+          {l:'Convert to Grayscale',f:()=>aipRecolor((r,g,b)=>{const y=.299*r+.587*g+.114*b;return [y,y,y];},'Converted to grayscale — check that figure regions still read clearly in print.'),d:!sel},
+          {l:'Invert Colors',f:()=>aipRecolor((r,g,b)=>[255-r,255-g,255-b],'Colors inverted.'),d:!sel},
+          {l:'Darken',f:()=>aipRecolor((r,g,b)=>[r*.8,g*.8,b*.8],'Colors darkened.'),d:!sel},
+          {l:'Lighten',f:()=>aipRecolor((r,g,b)=>[r+(255-r)*.25,g+(255-g)*.25,b+(255-b)*.25],'Colors lightened.'),d:!sel}]},
+        {l:'Drawing Styles…',f:click('dsStyleOpen')},'-',
+        {l:'Clear Canvas…',f:click('clearBtn')}
+      ],
+      Object:[
+        {l:'Transform',sub:[
+          {l:'Move…',k:'Shift+Ctrl+M',f:()=>aipTransformDialog('move'),d:!sel},{l:'Rotate…',f:()=>aipTransformDialog('rotate'),d:!sel},
+          {l:'Reflect Horizontal',f:click('flipHBtn'),d:!sel},{l:'Reflect Vertical',f:click('flipVBtn'),d:!sel},
+          {l:'Scale…',f:()=>aipTransformDialog('scale'),d:!sel},'-',
+          {l:'Rotate 90° Clockwise',f:click('rot90CwBtn'),d:!sel},{l:'Rotate 90° Counter-clockwise',f:click('rot90CcwBtn'),d:!sel},
+          {l:'Reset Rotation',f:()=>{aipEditable().forEach(o=>o.rotation=0);aipCommit();},d:!sel}]},
+        {l:'Arrange',sub:[
+          {l:'Bring to Front',k:'Shift+Ctrl+]',f:click('frontBtn'),d:!sel},{l:'Bring Forward',k:'Ctrl+]',f:click('upBtn'),d:!sel},
+          {l:'Send Backward',k:'Ctrl+[',f:click('downBtn'),d:!sel},{l:'Send to Back',k:'Shift+Ctrl+[',f:click('backBtn'),d:!sel}]},
+        {l:'Align',sub:[['left','Horizontal Left'],['hcenter','Horizontal Center'],['right','Horizontal Right'],['top','Vertical Top'],['vcenter','Vertical Center'],['bottom','Vertical Bottom']].map(([m,l])=>({l,f:()=>aipAlign(m),d:!sel}))},
+        {l:'Distribute',sub:[{l:'Horizontal Distribute Center',f:()=>document.querySelector('.distribute-btn[data-distribute="h"]')?.click(),d:n<3},{l:'Vertical Distribute Center',f:()=>document.querySelector('.distribute-btn[data-distribute="v"]')?.click(),d:n<3}]},'-',
+        {l:'Group',k:'Ctrl+G',f:groupSelection,d:n<2},{l:'Ungroup',k:'Shift+Ctrl+G',f:ungroupSelection,d:!objs.some(o=>o.groupId)},'-',
+        {l:'Lock Selection',k:'Ctrl+2',f:()=>aipLock(true),d:!sel},{l:'Unlock All',k:'Alt+Ctrl+2',f:()=>aipLock(false),d:!state.objects.some(o=>o.locked)},
+        {l:'Hide Selection',k:'Ctrl+3',f:()=>aipHide(true),d:!sel},{l:'Show All',k:'Alt+Ctrl+3',f:()=>aipHide(false),d:!state.objects.some(o=>o.visible===false)},'-',
+        {l:'Path',sub:[{l:'Edit Anchor Points',f:()=>dsSetMode('nodes'),d:!(single&&['line','bezier','path'].includes(single.type))},{l:'Pen Tool',k:'B',f:()=>dsSetMode('pen')}]},
+        {l:'Shape Merge (Pathfinder)',sub:[['union','Unite'],['subtract','Minus Front'],['intersect','Intersect'],['combine','Exclude'],['release','Release']].map(([m,l])=>({l,f:()=>mergeSelectedShapes(m),d:m==='release'?!sel:n<2}))},
+        {l:'Image',sub:[{l:'Edit with AI…',f:click('editAiImageBtn'),d:single?.type!=='image'},{l:'Image Trace (Convert to Vector)',f:click('vectorizeImageBtn'),d:single?.type!=='image'}]},'-',
+        {l:'Artboards',sub:[{l:'Fit to Artwork Bounds',f:()=>aipFitArtboard(false)},{l:'Fit to Selected Art',f:()=>aipFitArtboard(true),d:!sel},{l:'Artboard Size…',f:click('resizeCanvasBtn')},{l:'Journal Setup…',f:click('journalSetupBtn')}]}
+      ],
+      Type:[
+        {l:'Font',sub:[...($('topFontFamily')?.options||[])].map(o=>({l:o.text,f:()=>{const t=$('topFontFamily');t.value=o.value;t.dispatchEvent(new Event('change'));},c:$('topFontFamily')?.value===o.value}))},
+        {l:'Size',sub:[8,9,10,12,14,18,24,30,36,48,60,72].map(s=>({l:s+' pt',f:()=>{const t=$('topFontSize');t.value=s;t.dispatchEvent(new Event('change'));},c:Number($('topFontSize')?.value)===s}))},
+        {l:'Bold',f:()=>controls.boldBtn.click(),c:!!textDefaults.bold},{l:'Italic',f:()=>controls.italicBtn.click(),c:!!textDefaults.italic},{l:'Underline',f:()=>controls.underlineBtn.click(),c:!!textDefaults.underline},
+        {l:'Paragraph',sub:[['left','Align Left'],['center','Align Center'],['right','Align Right']].map(([a,l])=>({l,f:()=>aipTextSet(o=>o.textAlign=a),d:!hasText,c:single?.type==='text'&&(single.textAlign||'left')===a}))},'-',
+        {l:'Type Tool',k:'T',f:()=>teArm('text')},{l:'Heading',f:()=>teArm('heading')},{l:'Equation',k:'Q',f:()=>teArm('equation')},{l:'Boxed Result',f:()=>teArm('boxed')},'-',
+        {l:'Glyphs',grid:true,sub:AIP_GLYPHS.map(g=>({l:g,f:()=>insertSymbol(g)}))},
+        {l:'Scientific Labels',sub:AIP_SCI.map(s=>({l:s.replace(/\\([A-Za-z]+)/g,(t,w)=>SCI_SYMBOLS[w]||t),f:()=>insertSymbol(s)}))},'-',
+        {l:'Fit Text Box to Content',f:()=>window.EECanvasFitTextBox?.(),d:!hasText},
+        {l:'Convert Handwriting to Equation (AI)',f:click('recognizeSelectionBtn'),d:!!$('recognizeSelectionBtn')?.disabled}
+      ],
+      Select:[
+        {l:'All',k:'Ctrl+A',f:()=>aipSelect(aipVisible().filter(o=>!o.locked).map(o=>o.id))},
+        {l:'Deselect',k:'Shift+Ctrl+A',f:()=>aipSelect([]),d:!sel},
+        {l:'Inverse',f:()=>aipSelect(aipVisible().filter(o=>!o.locked&&!state.selectedIds.includes(o.id)).map(o=>o.id))},'-',
+        {l:'Next Object Above',k:'Alt+Ctrl+]',f:()=>aipSelectStep(1)},{l:'Next Object Below',k:'Alt+Ctrl+[',f:()=>aipSelectStep(-1)},'-',
+        {l:'Same',sub:[['fillStroke','Fill & Stroke'],['fill','Fill Color'],['stroke','Stroke Color'],['weight','Stroke Weight'],['opacity','Opacity'],['hatch','Material (Fill & Hatch)'],['type','Object Type']].map(([k,l])=>({l,f:()=>aipSelectSame(k),d:!sel}))},
+        {l:'Object',sub:[['text','All Text Objects'],['equation','All Equations'],['image','All Images'],['line','All Lines'],['arrow','All Arrows'],['rect','All Rectangles']].map(([t,l])=>({l,f:()=>aipSelect(aipVisible().filter(o=>o.type===t&&!o.locked).map(o=>o.id))}))}
+      ],
+      Effect:[
+        {l:'Drop Shadow',f:()=>aipShadow(true),d:!sel},{l:'Remove Drop Shadow',f:()=>aipShadow(false),d:!sel},'-',
+        {l:'Opacity',sub:[100,75,50,25].map(v=>({l:v+'%',f:()=>{aipEditable().forEach(o=>o.opacity=v/100);aipCommit();},d:!sel}))},
+        {l:'Blending Mode',sub:[['source-over','Normal'],['multiply','Multiply'],['screen','Screen'],['overlay','Overlay'],['darken','Darken'],['lighten','Lighten']].map(([v,l])=>({l,f:()=>{aipEditable().forEach(o=>o.blend=v);aipCommit();},d:!sel}))},
+        {l:'Hatch Pattern',sub:Object.entries(AIP_HATCH_NAMES).map(([k,l])=>({l,f:()=>aipSetHatch(k),d:!shapes}))}
+      ],
+      View:[
+        {l:'Zoom In',k:'Ctrl+=',f:()=>setZoom(aipNextZoom(state.zoom,false))},{l:'Zoom Out',k:'Ctrl+-',f:()=>setZoom(aipNextZoom(state.zoom,true))},
+        {l:'Fit Artboard in Window',k:'Ctrl+0',f:click('zoomFit')},{l:'Actual Size',k:'Ctrl+1',f:()=>setZoom(1)},{l:'Print Size',f:click('zoomPrint')},'-',
+        {l:'Rulers',k:'Ctrl+R',f:()=>aipToggleDesign('rulers'),c:!!sd.rulers},
+        {l:'Grid',k:"Ctrl+'",f:()=>aipToggleGrid('showGrid'),c:!!state.showGrid},{l:'Snap to Grid',k:"Shift+Ctrl+'",f:()=>aipToggleGrid('snapGrid'),c:!!state.snapGrid},
+        {l:'Guides',k:'Ctrl+;',f:()=>aipToggleDesign('showGuides'),c:!!sd.showGuides},{l:'Lock Guides',k:'Alt+Ctrl+;',f:()=>aipToggleDesign('locked'),c:!!sd.locked},
+        {l:'Snap to Guides',f:()=>aipToggleDesign('snapGuides'),c:!!sd.snapGuides},
+        {l:'Clear Guides',f:()=>{if(state.studioDesign?.guides?.length){state.studioDesign.guides=[];saveHistory();render();dsGuideList();}},d:!sd.guides?.length},'-',
+        {l:'Appearance',sub:[{l:'Bright',f:()=>{const t=$('themeToggle');t.value='light';t.dispatchEvent(new Event('change'));},c:document.documentElement.dataset.theme!=='dark'},{l:'Dark',f:()=>{const t=$('themeToggle');t.value='dark';t.dispatchEvent(new Event('change'));},c:document.documentElement.dataset.theme==='dark'}]}
+      ],
+      Window:[
+        {l:'Properties',f:()=>aipShowPanel('inspectorPanel'),c:!!ws?.classList.contains('panel-open')&&$('inspectorPanel')?.classList.contains('active')},
+        {l:'Layers',f:()=>aipShowPanel('layersPanel'),c:!!ws?.classList.contains('panel-open')&&$('layersPanel')?.classList.contains('active')},
+        {l:'Solid-State Kit',f:()=>aipShowPanel('ssPanel'),c:!!ws?.classList.contains('panel-open')&&$('ssPanel')?.classList.contains('active')},
+        {l:'Hide Side Panels',f:()=>{if(ws?.classList.contains('panel-open'))$('panelToggleBtn')?.click();},d:!ws?.classList.contains('panel-open')},'-',
+        {l:'Toolbar',f:()=>{const t=$('dsTools');if(t)t.hidden=!t.hidden;},c:!$('dsTools')?.hidden},
+        {l:'Rulers & Guides',f:click('dsGuideOpen'),c:!$('dsGuides')?.hidden},{l:'Drawing Styles',f:click('dsStyleOpen'),c:!$('dsStyles')?.hidden},
+        {l:'Template Library',k:'K',f:()=>openTemplateLibrary()}
+      ],
+      'Solid State':[
+        {l:'Band Diagram…',f:()=>buildBandDiagram()},{l:'Layer Stack…',f:()=>buildLayerStack()},{l:'Curve / Plot…',f:()=>buildCurve()},
+        {l:'AI Visual Creator…',f:()=>openAICreator('auto')},{l:'Template Library…',k:'K',f:()=>openTemplateLibrary()},'-',
+        ...STENCILS.map(sec=>({l:sec.g,sub:sec.items.map(([label,make])=>({l:label.replace(/\\([A-Za-z]+)/g,(t,w)=>SCI_SYMBOLS[w]||t),f:()=>placeGroup(make(),label)}))})),'-',
+        {l:'Apply Material',sub:Object.keys(MAT).map(k=>({l:AIP_MAT_NAMES[k]||k,sw:MAT[k].fill,f:()=>aipApplyMaterial(k),d:!shapes}))},'-',
+        tool('carrier','Carrier Tool','Shift+C'),tool('level','Energy Level Tool','Shift+L'),tool('dimension','Dimension Tool','Shift+D'),tool('measure','Measure Tool','Shift+M'),'-',
+        {l:'Drawing Scale…',f:aipScaleDialog},{l:'Insert Scale Bar',f:aipInsertScaleBar}
+      ],
+      Help:[
+        {l:'Keyboard Shortcuts',f:()=>window.EECanvasOpenShortcuts?.(),d:!window.EECanvasOpenShortcuts},
+        {l:'Command Palette',f:()=>window.EECanvasOpenCommands?.(),d:!window.EECanvasOpenCommands},'-',
+        {l:'Tool Tips: '+(aipUI.tool?AIP_TOOL_HELP[aipUI.tool].split(':')[0]:'current tool'),f:()=>setStatus(aipUI.tool?AIP_TOOL_HELP[aipUI.tool]:'Hover a tool for its name and shortcut; right-click or long-press a tool with a corner triangle for related tools.',8000)}
+      ]
+    };
+  }
+  function aipToggleDesign(key){state.studioDesign[key]=!state.studioDesign[key];saveHistory();render();dsGuideList();dsRefresh();aipSync();}
+  function aipToggleGrid(key){state[key]=!state[key];syncGridControls();saveHistory();render();dsRefresh();aipSync();}
+
+  const aim={bar:null,stack:[],top:null};
+  function aimClose(){aim.stack.forEach(m=>m.remove());aim.stack=[];aim.bar?.querySelectorAll('.aim-top').forEach(b=>{b.classList.remove('is-open');b.setAttribute('aria-expanded','false');});aim.top=null;}
+  function aimBuild(items,level,grid=false){
+    const menu=document.createElement('div');menu.className='aim-menu'+(grid?' aim-grid':'');menu.setAttribute('role','menu');
+    for(const it of items){
+      if(it==='-'){const s=document.createElement('div');s.className='aim-sep';s.setAttribute('role','separator');menu.append(s);continue;}
+      const b=document.createElement('button');b.type='button';b.className='aim-item';b.setAttribute('role','menuitem');b.disabled=!!it.d;
+      b.innerHTML=`<span class="aim-check">${it.c?'✓':''}</span>${it.sw?`<i class="aim-sw" style="background:${it.sw}"></i>`:''}<span class="aim-label"></span><span class="aim-key">${it.sub?'▸':(it.k||'')}</span>`;
+      b.querySelector('.aim-label').textContent=it.l;
+      if(it.sub){b.setAttribute('aria-haspopup','menu');const open=()=>{aimTrim(level+1);const child=aimBuild(it.sub,level+1,!!it.grid);aimPlace(child,b.getBoundingClientRect(),true);b.classList.add('is-open');};b.addEventListener('mouseenter',open);b.addEventListener('click',open);b.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();open();aim.stack.at(-1)?.querySelector('.aim-item:not(:disabled)')?.focus();}});}
+      else{b.addEventListener('mouseenter',()=>aimTrim(level+1));b.addEventListener('click',()=>{aimClose();try{it.f?.();}catch(err){console.error(err);setStatus(err.message||'That command failed.');}setTimeout(aipSync);});}
+      menu.append(b);
+    }
+    menu.addEventListener('keydown',e=>{
+      const list=[...menu.querySelectorAll('.aim-item:not(:disabled)')],i=list.indexOf(document.activeElement);
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();list[(i+(e.key==='ArrowDown'?1:list.length-1))%list.length]?.focus();}
+      else if(e.key==='ArrowLeft'&&level>0){e.preventDefault();aimTrim(level);aim.stack.at(-1)?.querySelector('.aim-item.is-open')?.focus();}
+      else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();const t=aim.top;aimClose();t?.focus();}
+    });
+    aim.stack.push(menu);document.body.append(menu);return menu;
+  }
+  function aimTrim(level){while(aim.stack.length>level)aim.stack.pop().remove();aim.stack.at(-1)?.querySelectorAll('.aim-item.is-open').forEach(b=>b.classList.remove('is-open'));}
+  function aimPlace(menu,r,side){
+    const w=menu.offsetWidth,h=menu.offsetHeight;
+    let x=side?r.right-2:r.left,y=side?r.top-4:r.bottom+2;
+    if(x+w>innerWidth-4)x=side?Math.max(4,r.left-w+2):Math.max(4,innerWidth-w-4);
+    if(y+h>innerHeight-4)y=Math.max(4,innerHeight-h-4);
+    menu.style.left=x+'px';menu.style.top=y+'px';
+  }
+  function aimOpen(btn){
+    aimClose();aim.top=btn;btn.classList.add('is-open');btn.setAttribute('aria-expanded','true');
+    const menu=aimBuild(aimMenus()[btn.dataset.menu]||[],0);aimPlace(menu,btn.getBoundingClientRect(),false);
+  }
+  function aimInit(){
+    const editMenu=$('editMenu');if(!editMenu)return;
+    const bar=document.createElement('nav');bar.className='aim-bar';bar.setAttribute('aria-label','Menu bar');aim.bar=bar;
+    for(const name of ['Edit','Object','Type','Select','Effect','View','Window','Solid State','Help']){
+      const b=document.createElement('button');b.type='button';b.className='aim-top';b.dataset.menu=name;b.textContent=name;b.setAttribute('aria-haspopup','menu');b.setAttribute('aria-expanded','false');
+      b.addEventListener('click',e=>{e.stopPropagation();aim.top===b?aimClose():aimOpen(b);});
+      b.addEventListener('mouseenter',()=>{if(aim.top&&aim.top!==b)aimOpen(b);});
+      b.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();if(aim.top!==b)aimOpen(b);aim.stack[0]?.querySelector('.aim-item:not(:disabled)')?.focus();}
+        else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const tops=[...bar.children],nx=tops[(tops.indexOf(b)+(e.key==='ArrowRight'?1:tops.length-1))%tops.length];nx.focus();if(aim.top)aimOpen(nx);}});
+      bar.append(b);
+    }
+    editMenu.after(bar);editMenu.classList.add('aim-replaced');
+    document.addEventListener('pointerdown',e=>{if(aim.top&&!e.target.closest('.aim-menu,.aim-bar'))aimClose();},true);
+    window.addEventListener('resize',aimClose);window.addEventListener('blur',aimClose);
+    // Opening File closes these menus and vice versa.
+    $('moreMenu')?.addEventListener('toggle',e=>{if(e.target.open)aimClose();});
+    bar.addEventListener('click',()=>$('moreMenu')?.removeAttribute('open'));
+  }
+
+  // ----- Illustrator keyboard shortcuts (called from the main key handler) -----
+  function aipHandleKey(e){
+    const mod=e.ctrlKey||e.metaKey,key=String(e.key||'').toLowerCase(),code=String(e.code||'');
+    if(aim.top&&key==='escape'){aimClose();return true;}
+    const run=fn=>{e.preventDefault();fn();return true;};
+    if(mod){
+      if(key==='x')return run(aipCut);
+      if(key==='a')return run(()=>e.shiftKey?aipSelect([]):aipSelect(aipVisible().filter(o=>!o.locked).map(o=>o.id)));
+      if(key==='v'&&e.shiftKey)return run(()=>aipPaste('place'));
+      if(key==='f'&&!e.shiftKey)return run(()=>aipPaste('front'));
+      if(key==='b'&&!e.shiftKey)return run(()=>aipPaste('back'));
+      if(key==='m'&&e.shiftKey)return run(()=>aipTransformDialog('move'));
+      if(code==='BracketRight'||code==='BracketLeft'){const up=code==='BracketRight';return run(()=>e.altKey?aipSelectStep(up?1:-1):$(up?(e.shiftKey?'frontBtn':'upBtn'):(e.shiftKey?'backBtn':'downBtn'))?.click());}
+      if(code==='Digit2')return run(()=>aipLock(!e.altKey));
+      if(code==='Digit3')return run(()=>aipHide(!e.altKey));
+      if(key==='r'&&!e.shiftKey)return run(()=>aipToggleDesign('rulers'));
+      if(code==='Quote')return run(()=>aipToggleGrid(e.shiftKey?'snapGrid':'showGrid'));
+      if(code==='Semicolon')return run(()=>aipToggleDesign(e.altKey?'locked':'showGuides'));
+      if(key==='='||key==='+')return run(()=>setZoom(aipNextZoom(state.zoom,false)));
+      if(key==='-'||key==='_')return run(()=>setZoom(aipNextZoom(state.zoom,true)));
+      if(code==='Digit0')return run(()=>$('zoomFit')?.click());
+      if(code==='Digit1')return run(()=>setZoom(1));
+      return false;
+    }
+    if(e.altKey)return false;
+    if(e.shiftKey){
+      const t={r:'rotate',m:'measure',c:'carrier',l:'level',d:'dimension'}[key];
+      if(t)return run(()=>aipSetTool(t));
+      if(key==='x'||key==='/')return false;
+      return false;
+    }
+    const t={z:'zoom',i:'eyedropper',s:'scale'}[key];
+    if(t)return run(()=>aipSetTool(t));
+    return false;
+  }
+
+  // ----- Tool Options content for the active tool -----
+  function aipToolOptionsHtml(){
+    const t=aipUI.tool,o=aipUI.opts;
+    const sel=(id,val,opts)=>`<select id="${id}">${opts.map(([v,l])=>`<option value="${v}"${v===val?' selected':''}>${l}</option>`).join('')}</select>`;
+    if(t==='carrier')return `<div class="aip-grid"><span class="aip-lab">Kind</span><div class="aip-ctl">${sel('aipOptCarrier',o.carrier,[['electron','Electron'],['hole','Hole'],['donor','Ionized donor ⊕'],['acceptor','Ionized acceptor ⊖']])}</div>
+      <span class="aip-lab">Style</span><div class="aip-ctl">${sel('aipOptCarrierStyle',o.carrierStyle,[['dot','Dots (● e⁻, ○ h⁺)'],['sign','Signed circles (−/+)']])}</div>
+      <span class="aip-lab">Size</span><div class="aip-ctl"><input id="aipOptCarrierSize" type="number" min="6" max="60" step="1" value="${o.carrierSize}"><span class="aip-unit">px</span></div></div>`;
+    if(t==='level')return `<div class="aip-grid"><span class="aip-lab">Level</span><div class="aip-ctl">${sel('aipOptLevel',o.level,[['Ec','Conduction band E_c'],['Ev','Valence band E_v'],['EF','Fermi level E_F'],['Ei','Intrinsic level E_i'],['Evac','Vacuum level E_vac'],['EFn','Quasi-Fermi E_Fn'],['EFp','Quasi-Fermi E_Fp'],['custom','Custom…']])}</div>
+      <span class="aip-lab">Label</span><div class="aip-ctl"><input id="aipOptLevelLabelOn" type="checkbox"${o.levelLabelOn?' checked':''} aria-label="Add label"><input id="aipOptLevelLabel" type="text" placeholder="e.g. E_t" value="${escapeHtmlAttr(o.levelLabel)}"${o.level==='custom'?'':' disabled'}></div></div>`;
+    if(t==='dimension'||t==='measure'){const s=aipScale();return `<div class="aip-row"><span class="aip-lab">Scale</span><span>${s.px} px = ${s.value} ${s.unit}</span><button type="button" class="aip-link-btn" id="aipOptScale">Change…</button></div>`+(t==='dimension'?`<div class="aip-row"><label class="aip-f"><span>Decimals:</span>${sel('aipOptDecimals',String(o.dimDecimals),[['0','0'],['1','1'],['2','2'],['3','3']])}</label></div>`:`<p class="aip-note aip-readout" id="aipMeasureOut">Drag on the canvas to measure.</p>`);}
+    if(t==='rotate'||t==='scale')return `<div class="aip-row aip-actions"><button type="button" id="aipOptDialog">${t==='rotate'?'Rotate…':'Scale…'}</button><button type="button" id="aipOptResetPivot">Reset Origin</button></div>`;
+    return '';
+  }
+  function aipBindToolOptions(host){
+    const o=aipUI.opts,save=()=>aipStore.save();
+    const on=(id,type,fn)=>host.querySelector('#'+id)?.addEventListener(type,fn);
+    on('aipOptCarrier','change',e=>{o.carrier=e.target.value;save();});on('aipOptCarrierStyle','change',e=>{o.carrierStyle=e.target.value;save();});
+    on('aipOptCarrierSize','change',e=>{o.carrierSize=clamp(aipNum(e.target.value,14),6,60);e.target.value=o.carrierSize;save();});
+    on('aipOptLevel','change',e=>{o.level=e.target.value;host.querySelector('#aipOptLevelLabel').disabled=o.level!=='custom';save();});
+    on('aipOptLevelLabelOn','change',e=>{o.levelLabelOn=e.target.checked;save();});on('aipOptLevelLabel','change',e=>{o.levelLabel=e.target.value.slice(0,24);save();});
+    on('aipOptDecimals','change',e=>{o.dimDecimals=Number(e.target.value);save();});
+    on('aipOptScale','click',aipScaleDialog);
+    on('aipOptDialog','click',()=>aipTransformDialog(aipUI.tool));
+    on('aipOptResetPivot','click',()=>{aipUI.pivot=null;aipDrawOverlay();});
+  }
+
   aipInstallInput();
   dsInit();
   aipAddToolButtons();
   aipInit();
+  aimInit();
 
   loadInputPreferences();
 
@@ -22311,6 +22774,42 @@ html[data-theme="dark"] #dsTools .ai-tool.is-active,html[data-theme="dark"] #dsT
 #aipToolOptionsBody select{flex:1}
 .aip-zoom-box{position:fixed;z-index:300;border:1px dashed #1473e6;background:rgba(20,115,230,.08);pointer-events:none}
 @media print{.aip-zoom-box{display:none!important}}
+/* Illustrator-style menu bar (Edit … Help) */
+#editMenu.aim-replaced{display:none!important}
+.aim-bar{display:flex;align-items:center;gap:0;flex:0 0 auto;font:12.5px/1 "Segoe UI",system-ui,Arial,sans-serif}
+.aim-top{height:28px;min-height:0;padding:0 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text);font:inherit;cursor:default;white-space:nowrap}
+.aim-top:hover,.aim-top.is-open{background:var(--soft,rgba(9,105,218,.1));border-color:var(--soft-border,transparent)}
+.aim-top:focus-visible{outline:2px solid var(--brand,#1473e6);outline-offset:-2px}
+.aim-menu{position:fixed;z-index:400;min-width:220px;max-height:calc(100vh - 12px);overflow-y:auto;padding:4px 0;border:1px solid var(--line);border-radius:6px;background:var(--surface,#fff);color:var(--text);box-shadow:0 4px 12px rgba(0,0,0,.14),0 12px 32px rgba(0,0,0,.12);font:12px/1.3 "Segoe UI",system-ui,Arial,sans-serif}
+.aim-item{display:flex;align-items:center;gap:6px;width:100%;height:26px;min-height:0;padding:0 14px 0 6px;border:0;border-radius:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:default}
+.aim-item:disabled{color:var(--muted);opacity:.55}
+.aim-item:not(:disabled):hover,.aim-item:not(:disabled):focus-visible,.aim-item.is-open{outline:0;background:var(--brand,#1473e6);color:#fff}
+.aim-item:not(:disabled):hover .aim-key,.aim-item:not(:disabled):focus-visible .aim-key,.aim-item.is-open .aim-key{color:#fff}
+.aim-check{width:14px;flex:none;text-align:center;font-size:11px}
+.aim-label{flex:1;white-space:nowrap}
+.aim-key{flex:none;padding-left:22px;color:var(--muted);font-size:11px;white-space:nowrap}
+.aim-sw{flex:none;width:12px;height:12px;border:1px solid rgba(0,0,0,.35);border-radius:2px}
+.aim-sep{height:1px;margin:4px 0;background:var(--line)}
+.aim-grid{display:grid;grid-template-columns:repeat(8,30px);min-width:0;padding:4px}
+.aim-grid .aim-item{justify-content:center;width:30px;height:30px;padding:0;border-radius:4px;font-size:15px}
+.aim-grid .aim-check,.aim-grid .aim-key{display:none}
+.aim-grid .aim-label{flex:none}
+/* Tool overlay: origin point, measure line, creation preview */
+#aipOverlay{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:13}
+#aipOverlay *{vector-effect:non-scaling-stroke}
+.aip-ov-pivot circle,.aip-ov-pivot path{fill:none;stroke:#1473e6;stroke-width:1.5}
+.aip-ov-pivot circle{fill:rgba(255,255,255,.7)}
+.aip-ov-measure path{stroke:#e11d48;stroke-width:1.5;stroke-dasharray:5 3}
+.aip-ov-measure circle{fill:#fff;stroke:#e11d48;stroke-width:1.5}
+.aip-ov-measure text{fill:#e11d48;font-family:"Segoe UI",Arial,sans-serif;font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:3px;vector-effect:none}
+.aip-ov-preview{stroke:#1473e6;stroke-width:1.5;stroke-dasharray:6 4;fill:none}
+.aip-link-btn{min-height:0;margin-left:auto;padding:2px 6px;border:0;background:transparent;color:var(--brand,#1473e6);font:11.5px "Segoe UI",system-ui,Arial,sans-serif;cursor:pointer}
+.aip-link-btn:hover{text-decoration:underline}
+.aip-readout{font-variant-numeric:tabular-nums;color:var(--text)!important}
+#aipToolOptsExtra .aip-grid{grid-template-columns:44px 1fr}
+#aipToolOptsExtra input[type=text]{flex:1}
+@media print{.aim-menu,#aipOverlay{display:none!important}}
+@media(max-width:1100px){.aim-top{padding:0 5px;font-size:11.5px}}
 </style>
 <script id="ee-illustrator-toolbar-runtime">
 window.addEventListener('DOMContentLoaded',()=>{
@@ -22338,6 +22837,12 @@ window.addEventListener('DOMContentLoaded',()=>{
   hand:'<path d="M7 12V7a2 2 0 0 1 4 0v4-7a2 2 0 0 1 4 0v7-4a2 2 0 0 1 4 0v8c0 5-10 8-13 2l-3-4c-2-3 0-5 2-3Z"/>',
   zoom:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5" stroke-width="2"/>',
   eyedropper:'<path d="m4 20 1-4 8.5-8.5 3 3L8 19Z"/><path d="m12.5 6.5 5 5"/><path d="M15 9l2.8-2.8a2.1 2.1 0 0 0-3-3L12 6"/>',
+  rotate:'<path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M17.5 2.8v4.4h-4.4"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/>',
+  scale:'<rect x="3.5" y="10.5" width="10" height="10"/><path d="M10 4h10v10" stroke-dasharray="2.2 2"/><path d="m11 13 8-8M14 5h5v5"/>',
+  measure:'<path d="m3 16.5 13.5-13.5 4.5 4.5L7.5 21Z"/><path d="m7 12.5 2 2M10 9.5l1.5 1.5M13 6.5l2 2"/>',
+  carrier:'<circle cx="8" cy="9" r="3.6" fill="currentColor"/><circle cx="16.5" cy="15.5" r="3.6"/><path d="M15 15.5h3M16.5 14v3"/>',
+  level:'<path d="M3 7h13M3 17h13"/><path d="M3 12h13" stroke-dasharray="2.5 2"/><path d="M18.5 5v4M18.5 15v4"/>',
+  dimension:'<path d="M4 6v12M20 6v12M4 12h16"/><path d="m7.5 9-3.5 3 3.5 3M16.5 9l3.5 3-3.5 3"/>',
   props:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   guides:'<path d="M3.5 3.5h17v17h-17ZM8 3.5v3M12 3.5v4.5M16 3.5v3M3.5 12H8M3.5 16h3"/>',
   styles:'<path d="M4 4h7v7H4ZM13 4h7v7h-7ZM4 13h7v7H4ZM13 13h7v7h-7Z"/>',
@@ -22376,7 +22881,11 @@ window.addEventListener('DOMContentLoaded',()=>{
   'sep',
   [['eraser','Eraser Tool','E']],
   'sep',
-  [['eyedropper','Eyedropper Tool','I']],
+  [['rotate','Rotate Tool','Shift+R'],['scale','Scale Tool','S']],
+  [['eyedropper','Eyedropper Tool','I'],['measure','Measure Tool','Shift+M']],
+  'sep',
+  [['carrier','Carrier Tool — electrons, holes, ions','Shift+C']],
+  [['level','Energy Level Tool — E_c, E_v, E_F…','Shift+L'],['dimension','Dimension Tool','Shift+D']],
   'sep',
   [['hand','Hand Tool','H']],
   [['zoom','Zoom Tool','Z']]
