@@ -2,6 +2,131 @@
 
 <html lang="en">
 <head>
+<script id="suite-file-memory">
+/* Remember the last-used folder for Open and Save (all Maestra / Solar Device Lab apps).
+   Chromium-based browsers (Chrome, Edge) expose the File System Access API: file pickers
+   are given a stable id and start in the folder of the last file opened or saved. That
+   file's handle is kept in IndexedDB, so the folder is remembered across sessions. Other
+   browsers keep their normal file input / download behaviour. Nothing here reads or
+   uploads file contents beyond what the app itself asked for. */
+(() => {
+  'use strict';
+  if (window.__suiteFileMemory) return;
+  window.__suiteFileMemory = true;
+  const W = window, PICK_ID = 'maestra-suite-files';
+  const nativeOpen = W.showOpenFilePicker?.bind(W), nativeSave = W.showSaveFilePicker?.bind(W), nativeDir = W.showDirectoryPicker?.bind(W);
+  // Same-origin frames (the embedded canvas) are fine; cross-origin or sandboxed frames keep native dialogs.
+  let framed = false; try { framed = W.self !== W.top && !W.frameElement; } catch (_) { framed = true; }
+  const supported = !!(nativeOpen && nativeSave) && W.isSecureContext !== false && !framed;
+
+  // ---- last-used handle in IndexedDB ----
+  let lastHandle = null;
+  const idb = (mode, fn) => new Promise(res => {
+    try {
+      const rq = indexedDB.open('maestra-file-memory', 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore('h');
+      rq.onerror = () => res(null);
+      rq.onsuccess = () => { try { const tx = rq.result.transaction('h', mode), st = tx.objectStore('h'), r = fn(st); tx.oncomplete = () => res(r?.result ?? null); tx.onerror = () => res(null); } catch (_) { res(null); } };
+    } catch (_) { res(null); }
+  });
+  const ready = supported ? idb('readonly', st => st.get('last')).then(h => { if (h && !lastHandle) lastHandle = h; }) : Promise.resolve();
+  const remember = h => { if (!h) return; lastHandle = h; idb('readwrite', st => st.put(h, 'last')); };
+  const startOpts = o => { const out = Object.assign({ id: PICK_ID }, o || {}); if (!out.startIn) out.startIn = lastHandle || 'documents'; return out; };
+
+  // ---- wrap the native pickers for apps that call them directly ----
+  if (supported) {
+    W.showOpenFilePicker = async o => { await ready; const hs = await nativeOpen(startOpts(o)); remember(hs?.[0]); return hs; };
+    W.showSaveFilePicker = async o => { await ready; const h = await nativeSave(startOpts(o)); remember(h); return h; };
+    if (nativeDir) W.showDirectoryPicker = async o => { await ready; const h = await nativeDir(startOpts(o)); remember(h); return h; };
+  }
+
+  // ---- helpers ----
+  const MIME = { json: 'application/json', csv: 'text/csv', txt: 'text/plain', html: 'text/html', htm: 'text/html', svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', zip: 'application/zip', m: 'text/plain', tex: 'text/plain', md: 'text/markdown' };
+  const extOf = name => (/\.([a-z0-9]+)$/i.exec(name || '') || [])[1]?.toLowerCase() || '';
+  const typesFromAccept = accept => {
+    const parts = String(accept || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!parts.length) return undefined;
+    const acc = {};
+    for (const p of parts) {
+      if (p.startsWith('.')) { const m = MIME[p.slice(1).toLowerCase()] || 'application/octet-stream'; (acc[m] = acc[m] || []).push(p); }
+      else if (/^[\w.+-]+\/[\w.+*-]+$/.test(p)) acc[p] = acc[p] || [];
+    }
+    return Object.keys(acc).length ? [{ description: 'Supported files', accept: acc }] : undefined;
+  };
+  const isAbort = e => e && (e.name === 'AbortError');
+
+  // ---- Open: <input type="file"> ----
+  const nativeInputClick = HTMLInputElement.prototype.click;
+  const nativeShowPicker = HTMLInputElement.prototype.showPicker;
+  const busy = new WeakSet();
+  async function pickInto(input) {
+    if (busy.has(input)) return; busy.add(input);
+    try {
+      await ready;
+      const handles = await nativeOpen(startOpts({ multiple: input.multiple, types: typesFromAccept(input.accept), excludeAcceptAllOption: false }));
+      remember(handles[0]);
+      const dt = new DataTransfer();
+      for (const h of handles) dt.items.add(await h.getFile());
+      input.files = dt.files;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch (e) {
+      if (!isAbort(e)) { busy.delete(input); console.warn('[file memory] falling back to the browser file dialog:', e); nativeInputClick.call(input); return; }
+    } finally { busy.delete(input); }
+  }
+  const handles = input => supported && input instanceof HTMLInputElement && input.type === 'file' && !input.webkitdirectory && !input.disabled && !input.hasAttribute('data-native-picker');
+  if (supported) {
+    HTMLInputElement.prototype.click = function () { if (handles(this) && !this.isConnected) { pickInto(this); return; } return nativeInputClick.call(this); };
+    if (nativeShowPicker) HTMLInputElement.prototype.showPicker = function () { if (handles(this)) { pickInto(this); return; } return nativeShowPicker.call(this); };
+    // Connected inputs (and <label for=…>) are opened by a click event; intercept its default action.
+    document.addEventListener('click', e => {
+      const t = e.target; if (!handles(t) || e.defaultPrevented) return;
+      e.preventDefault(); pickInto(t);
+    }, false);
+  }
+
+  // ---- Save: <a download> with blob: or data: URLs ----
+  // Apps usually revoke the blob URL right after a.click(); keep each blob reachable for a
+  // minute so the save dialog (asynchronous) can still write it.
+  const blobs = new Map();
+  const nativeCreate = URL.createObjectURL.bind(URL), nativeRevoke = URL.revokeObjectURL.bind(URL);
+  URL.createObjectURL = obj => { const u = nativeCreate(obj); if (obj instanceof Blob) blobs.set(u, obj); return u; };
+  URL.revokeObjectURL = u => { setTimeout(() => { blobs.delete(u); nativeRevoke(u); }, 60000); };
+  const dataToBlob = href => { const m = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(href); if (!m) return null; const raw = m[2] ? atob(m[3]) : decodeURIComponent(m[3]); const a = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) a[i] = raw.charCodeAt(i) & 255; return new Blob([a], { type: m[1] || 'application/octet-stream' }); };
+  const nativeAnchorClick = HTMLAnchorElement.prototype.click;
+  async function saveVia(a, blob) {
+    const name = a.download || 'download';
+    try {
+      await ready;
+      const ext = extOf(name), mime = blob.type && /^[\w.+-]+\/[\w.+-]+$/.test(blob.type) ? blob.type : (MIME[ext] || 'application/octet-stream');
+      const types = ext ? [{ description: ext.toUpperCase() + ' file', accept: { [mime]: ['.' + ext] } }] : undefined;
+      const h = await nativeSave(startOpts({ suggestedName: name, types }));
+      remember(h);
+      const w = await h.createWritable(); await w.write(blob); await w.close();
+      W.dispatchEvent(new CustomEvent('suite-file-saved', { detail: { name: h.name } }));
+    } catch (e) {
+      if (isAbort(e)) return;
+      console.warn('[file memory] falling back to a normal download:', e);
+      nativeAnchorClick.call(a);
+    }
+  }
+  const savable = a => supported && a instanceof HTMLAnchorElement && a.hasAttribute('download') && !a.hasAttribute('data-native-download') && /^(blob:|data:)/.test(a.href || '');
+  const tryIntercept = a => {
+    if (!savable(a)) return false;
+    const blob = a.href.startsWith('blob:') ? blobs.get(a.href) : dataToBlob(a.href);
+    if (!blob) return false;
+    saveVia(a, blob); return true;
+  };
+  if (supported) {
+    HTMLAnchorElement.prototype.click = function () { if (!this.isConnected && tryIntercept(this)) return; return nativeAnchorClick.call(this); };
+    document.addEventListener('click', e => {
+      const a = e.target?.closest?.('a[download]'); if (!a || e.defaultPrevented || e.button > 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      if (tryIntercept(a)) e.preventDefault();
+    }, false);
+  }
+  W.SuiteFileMemory = { supported, forget: () => { lastHandle = null; idb('readwrite', st => st.delete('last')); }, get lastName() { return lastHandle?.name || null; } };
+})();
+</script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>EE Canvas — V3.26 Drawing Studio</title>
