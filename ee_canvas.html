@@ -129,7 +129,7 @@
 </script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>EE Canvas — V3.26 Drawing Studio</title>
+<title>EE Canvas — V3.27 Drawing Studio</title>
 <script id="ee-suite-theme-bootstrap">
 (function(){
   try{
@@ -2332,6 +2332,39 @@ root.EEProjectFile={FORMAT,VERSION,clone,normalize,canvases,update,assessmentOf,
 })(typeof window!=='undefined'?window:globalThis);
 
 </script>
+<style id="ee-3d-fill-style">
+/* Properties ▸ Fill and Properties ▸ 3D and Materials */
+.ee-seg{display:flex;gap:2px;padding:2px;margin:2px 0 8px;border-radius:7px;background:var(--ai-hover,#eef1f5)}
+.ee-seg button{flex:1 1 0;min-width:0;padding:5px 2px;border:0;border-radius:5px;background:transparent;color:var(--ai-muted,#64748b);font:600 11px/1 inherit;cursor:pointer;white-space:nowrap}
+.ee-seg button:hover{color:var(--ai-text,#1e293b)}
+.ee-seg button[aria-checked="true"]{background:var(--ai-bg,#fff);color:var(--ai-accent,#2563eb);box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.ee-gbar{height:16px;margin:2px 0 6px;border-radius:4px;border:1px solid var(--ai-line,#d6dbe3);cursor:copy;background:#fff}
+.ee-stop{display:flex;align-items:center;gap:6px;margin:0 0 5px}
+.ee-stop .aip-f input{width:46px}
+.ee-swatches{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin:4px 0 6px}
+.ee-swatches button{aspect-ratio:1;min-width:0;padding:0;border:1px solid var(--ai-line,#d6dbe3);border-radius:4px;cursor:pointer;overflow:hidden;background:#fff}
+.ee-swatches button:hover{outline:2px solid var(--ai-accent,#2563eb);outline-offset:1px}
+.ee-swatches canvas{display:block;width:100%;height:100%}
+.ee-styles{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+.ee-styles button,.ee-views button{padding:4px 7px;border:1px solid var(--ai-line,#d6dbe3);border-radius:5px;background:var(--ai-bg,#fff);color:var(--ai-text,#1e293b);font:500 11px/1.2 inherit;cursor:pointer}
+.ee-styles button:hover,.ee-views button:hover{border-color:var(--ai-accent,#2563eb);color:var(--ai-accent,#2563eb)}
+.ee-views{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 8px}
+.ee-pad{position:relative;height:78px;margin:2px 0 8px;border:1px dashed var(--ai-line,#cbd5e1);border-radius:8px;color:var(--ai-accent,#2563eb);cursor:grab;touch-action:none;user-select:none;display:grid;place-items:center}
+.ee-pad:active{cursor:grabbing}
+.ee-pad svg{width:120px;height:70px}
+.ee-pad span{position:absolute;right:8px;bottom:5px;font:10.5px/1 inherit;color:var(--ai-muted,#64748b)}
+.ee-3num{grid-template-columns:repeat(3,1fr)!important;margin-bottom:6px}
+.ee-3num .aip-f{display:flex;align-items:center;gap:4px;min-width:0}
+.ee-3num .aip-f span{flex:0 0 auto;width:auto!important;min-width:0!important;font-size:11px}
+.ee-3num .aip-f input{min-width:0;width:100%}
+.ee-sl{display:grid;gap:4px;margin:2px 0 6px}
+.ee-sl label{display:grid;grid-template-columns:78px 1fr;align-items:center;gap:6px;font:11px/1.2 inherit;color:var(--ai-text,#1e293b)}
+.ee-sl input[type=range]{width:100%;accent-color:var(--ai-accent,#2563eb)}
+.ee-chk{display:inline-flex;align-items:center;gap:4px;margin-left:6px;font:11px/1 inherit;white-space:nowrap}
+.ee-layer{display:grid;grid-template-columns:auto minmax(0,1fr) 48px auto auto auto;gap:4px;align-items:center;margin:0 0 4px}
+.ee-layer input[type=text],.ee-layer input[type=number]{min-width:0;width:100%;box-sizing:border-box;padding:3px 5px;font:11px inherit}
+#ee3StackPreset{max-width:150px}
+</style>
 </head>
 <body>
 <div class="app">
@@ -2439,6 +2472,8 @@ root.EEProjectFile={FORMAT,VERSION,clone,normalize,canvases,update,assessmentOf,
 <option value="metal">Metal ###</option><option value="poly">Poly |||</option>
 <option value="ntype">n dots</option><option value="ptype">p cross</option>
 <option value="nitride">Nitride</option><option value="substrate">Substrate \\\</option>
+<option value="dots">Dots</option><option value="grid">Grid</option><option value="checker">Checker</option><option value="bricks">Bricks</option>
+<option value="waves">Waves</option><option value="hlines">Horizontal lines</option><option value="vlines">Vertical lines</option><option value="crosshatch">Cross-hatch</option>
 </select>
 </div>
 </div></div></details><details class="compact-option-menu" id="compactPenMenu"><summary title="Stylus, touch, and ink smoothing settings"><span class="option-icon">✍</span><span class="option-text">Pen</span></summary><div class="compact-option-panel"><div class="properties">
@@ -6981,6 +7016,14 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
   }
 
   const ENGINEERING_TEMPLATES = [
+    { id: "ee3d-primitives", title: "3D Primitives", category: "3D & fills", description: "Box, cylinder, cone, sphere, pyramid, prism and torus — rotate with the 3D Rotate tool or Properties ▸ 3D.", build: buildEe3dPrimitives },
+    { id: "ee3d-mos-stack", title: "3D MOS Gate Stack", category: "3D & fills", description: "Isometric substrate / gate oxide / poly gate / contact stack with editable layers and labels.", build: buildEe3dStack("mos", "MOS gate stack (3D)") },
+    { id: "ee3d-solar-stack", title: "3D Si Solar Cell Stack", category: "3D & fills", description: "Back contact, emitter, absorber, ITO and glass as an editable 3D layer stack.", build: buildEe3dStack("solar", "Silicon solar cell (3D)") },
+    { id: "ee3d-oled-stack", title: "3D OLED Stack", category: "3D & fills", description: "Glass, ITO, HTL, emissive layer, ETL and cathode as a 3D layer stack.", build: buildEe3dStack("oled", "OLED device stack (3D)") },
+    { id: "ee3d-capacitor", title: "3D Parallel-Plate Capacitor", category: "3D & fills", description: "Metal plates and dielectric in 3D with charge and permittivity labels.", build: buildEe3dCapacitor },
+    { id: "ee3d-wafer", title: "3D Wafer and Die", category: "3D & fills", description: "Metallic wafer disk with a die on top, in perspective.", build: buildEeWaferDie },
+    { id: "ee-fill-board", title: "Gradient & Pattern Swatches", category: "3D & fills", description: "Ready-made gradient (metal, Si, oxide, thermal…) and pattern fills to copy with the Eyedropper.", build: buildEeFillBoard },
+    { id: "ee-image-frames", title: "Image Frames", category: "3D & fills", description: "Rectangle and round frames with an image fill — choose your own picture in Properties ▸ Fill.", build: buildEeImageFrame },
     { id: "planar-mos-slide", title: "Planar MOS Device (Slide Style)", category: "Device structures", description: "Dark-background lecture-style planar MOS template with curved n+ source/drain pockets and four terminals.", build: buildPlanarMOSCapSlide },
     { id: "planar-nmos-slide", title: "Planar nMOS (Slide Style)", category: "Device structures", description: "Professional annotated nMOS slide template inspired by textbook cross-sections and lecture figures.", build: buildPlanarNMOSSlide },
     { id: "pmos-well", title: "pMOS in n-Well", category: "Device structures", description: "Editable pMOS cross-section with p+ source/drain, n-well, gate stack, and hole channel.", build: buildPMOSWell },
@@ -7378,7 +7421,11 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
       c.save(); c.globalAlpha = o.opacity ?? 1; c.strokeStyle = o.stroke || "transparent"; c.fillStyle = o.fill || "transparent";
       c.lineWidth = Math.max(.7, (o.strokeWidth || 0) * scale); c.lineCap = "round"; c.lineJoin = "round";
       c.setLineDash(Array.isArray(o.dash) ? o.dash.map(v => v * scale) : []);
-      if (o.type === "rect") {
+      if (o.type === "solid3d" || ((o.type === "rect" || o.type === "ellipse") && o.fillMode && o.fillMode !== "solid")) {
+        c.translate(dx,dy); c.scale(scale,scale);
+        if (o.type === "solid3d") ee3dDraw(c,o);
+        else { if (o.type === "rect") roundedRectPath(c,o.x,o.y,o.w,o.h,o.cornerRadius||0); else { c.beginPath(); c.ellipse(o.x+o.w/2,o.y+o.h/2,Math.abs(o.w/2),Math.abs(o.h/2),0,0,Math.PI*2); } fillShape(o,c); c.lineWidth=Math.max(.7,o.strokeWidth||0); if(o.strokeWidth)c.stroke(); }
+      } else if (o.type === "rect") {
         const x=o.x*scale+dx,y=o.y*scale+dy,ww=o.w*scale,hh=o.h*scale,r=(o.cornerRadius||0)*scale;
         roundedRectPath(c,x,y,ww,hh,r); if(o.fill)c.fill(); if(o.strokeWidth)c.stroke();
       } else if (o.type === "ellipse") {
@@ -7973,7 +8020,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
   function objectName(o) {
     return o.name || ({
       path: "Drawing", line: "Line", bezier: "Bezier Curve", arrow: "Arrow", rect: "Rectangle",
-      ellipse: "Ellipse", triangle: "Triangle", star: "Star", text: "Text", equation: "Equation", image: "Image"
+      ellipse: "Ellipse", triangle: "Triangle", star: "Star", text: "Text", equation: "Equation", image: "Image", solid3d: "3D Object"
     }[o.type] || "Object");
   }
 
@@ -8816,7 +8863,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
       const xs = o.editPoints.map(p => p.x), ys = o.editPoints.map(p => p.y);
       return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
     }
-    if (["rect", "ellipse", "triangle", "star", "image", "text", "equation"].includes(o.type)) {
+    if (["rect", "ellipse", "triangle", "star", "image", "text", "equation", "solid3d"].includes(o.type)) {
       return { x: o.x, y: o.y, w: o.w, h: o.h };
     }
     if (o.type === "line" || o.type === "arrow") {
@@ -10694,7 +10741,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
     
     if (dsIsCurve(o)) {
       const path = new Path2D(dsPathData(o));
-      if (o.closed && o.fill) { ctx.fillStyle = o.fill; ctx.fill(path); }
+      if (o.closed && (o.fill || (o.fillMode && o.fillMode !== "solid" && o.fillMode !== "pattern"))) eeFillCurrentPath(o, ctx, path);
       if (o.stroke && o.strokeWidth > 0) ctx.stroke(path);
     }
     else if (o.type === "path" && o.points?.length > 1) {
@@ -10724,7 +10771,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
         ctx.moveTo(start.x, start.y);
         ctx.quadraticCurveTo(o.cx, o.cy, end.x, end.y);
       }
-      if (o.closed && o.fill && o.fill !== "transparent") ctx.fill();
+      if (o.closed && ((o.fill && o.fill !== "transparent") || (o.fillMode && o.fillMode !== "solid" && o.fillMode !== "pattern"))) eeFillCurrentPath(o, ctx);
       ctx.stroke();
 
       // While creating the curve, show the construction lines and points.
@@ -10795,6 +10842,9 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
         ctx.closePath(); ctx.fill();
         ctx.restore();
       }
+    }
+    else if (o.type === "solid3d") {
+      ee3dDraw(ctx, o);
     }
     else if (o.type === "image" || o.type === "equation") {
       if (o.type === "equation") teDrawBoxCanvas(o);
@@ -15450,7 +15500,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
     const sh = o.shadow?.enabled ? ` style="filter:drop-shadow(${o.shadow.x || 0}px ${o.shadow.y || 0}px ${o.shadow.blur || 0}px ${o.shadow.color || "#000"})"` : "";
     const dash = Array.isArray(o.dash) && o.dash.length ? ` stroke-dasharray="${o.dash.join(" ")}"` : "";
     const cap = o.lineCap && o.lineCap !== "round" ? ` stroke-linecap="${o.lineCap}"` : "";
-    return ` fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.strokeWidth || 0}" opacity="${o.opacity ?? 1}"${dash}${cap}${sh}`;
+    return ` fill="${eeSvgFill(o)}" stroke="${o.stroke || "none"}" stroke-width="${o.strokeWidth || 0}" opacity="${o.opacity ?? 1}"${dash}${cap}${sh}`;
   }
   function svgTransform(o) {
     const b = baseBounds(o), c = boundsCenter(b);
@@ -15475,7 +15525,15 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
         ptype: '<path d="M0,12 l12,-12 M0,0 l12,12" stroke="COL" stroke-width=".9"/>',
         poly: '<path d="M3,0 V12 M8,0 V12" stroke="COL" stroke-width="1.1"/>',
         ntype: '<circle cx="3" cy="3" r="1.35" fill="COL"/><circle cx="9" cy="9" r="1.35" fill="COL"/>',
-        nitride: '<path d="M0,3 H12 M0,8 H12" stroke="COL" stroke-width="1"/><circle cx="6" cy="1" r="1.1" fill="COL"/>'
+        nitride: '<path d="M0,3 H12 M0,8 H12" stroke="COL" stroke-width="1"/><circle cx="6" cy="1" r="1.1" fill="COL"/>',
+        dots: '<circle cx="6" cy="6" r="1.7" fill="COL"/>',
+        grid: '<path d="M.5,0 V12 M0,.5 H12" stroke="COL" stroke-width="1.1"/>',
+        checker: '<path d="M0,0h6v6H0Z M6,6h6v6H6Z" fill="COL" fill-opacity=".55"/>',
+        bricks: '<path d="M0,.5 H12 M0,6.5 H12 M.5,0 V6 M6.5,6 V12" stroke="COL" stroke-width="1.1"/>',
+        waves: '<path d="M0,3 C3,0 3,0 6,3 C9,6 9,6 12,3 M0,9 C3,6 3,6 6,9 C9,12 9,12 12,9" fill="none" stroke="COL" stroke-width="1.1"/>',
+        hlines: '<path d="M0,3 H12 M0,9 H12" stroke="COL" stroke-width="1.1"/>',
+        vlines: '<path d="M3,0 V12 M9,0 V12" stroke="COL" stroke-width="1.1"/>',
+        crosshatch: '<path d="M0,6 H12 M6,0 V12" stroke="COL" stroke-width="1.1"/>'
       }[o.hatch] || "";
       svgHatchDefs.set(id, `<pattern id="${id}" width="12" height="12" patternUnits="userSpaceOnUse">${strokes.replace(/COL/g, color)}</pattern>`);
     }
@@ -15485,10 +15543,14 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
     const size = layout.size, lh = layout.lineHeight, startY = layout.startY;
     const blocks = layout.lines.map((line, i) => {
       const baseY = startY + i * lh + size * .82;
+      // tspan dy is cumulative: emit the change from the previous run, matching the canvas offsets
+      // (kind 1 = subscript, +0.2 em; kind -1 = superscript, -0.38 em).
+      let shift = 0;
       const runs = parseSci(line).map(r => {
         const fs = r.kind ? size * .64 : size;
-        const dy = r.kind === 1 ? -size * .18 : r.kind === -1 ? size * .30 : 0;
-        return `<tspan dy="${dy}" font-size="${fs}">${svgEscape(r.text)}</tspan>`;
+        const target = r.kind === 1 ? size * .2 : r.kind === -1 ? -size * .38 : 0;
+        const dy = target - shift; shift = target;
+        return `<tspan dy="${+dy.toFixed(3)}" font-size="${fs}">${svgEscape(r.text)}</tspan>`;
       }).join("");
       return `<tspan x="${x}" y="${baseY}">${runs}</tspan>`;
     }).join("");
@@ -15535,7 +15597,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
   }
 
   function toSvg(options = {}) {
-    svgHatchDefs.clear();
+    svgHatchDefs.clear(); eeSvgFillDefs.clear();
     const journal = normalizeJournalSettings(state.journal);
     const physical = journal.enabled && options.physical !== false;
     const transparent = options.transparent ?? (journal.transparentBackground || controls.transparentExport.checked);
@@ -15546,7 +15608,8 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
       if (dsIsCurve(o)) body += `<path d="${dsPathData(o)}"${svgStyle({...o,fill:o.closed?o.fill:null})}${tr}/>`;
       else if (o.type === "rect") body += `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="${o.cornerRadius || 0}"${st}${tr}/>` + svgHatch(o, `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="${o.cornerRadius || 0}"`, tr);
       else if (o.type === "ellipse") body += `<ellipse cx="${o.x + o.w / 2}" cy="${o.y + o.h / 2}" rx="${o.w / 2}" ry="${o.h / 2}"${st}${tr}/>` + svgHatch(o, `<ellipse cx="${o.x + o.w / 2}" cy="${o.y + o.h / 2}" rx="${o.w / 2}" ry="${o.h / 2}"`, tr);
-      else if (o.type === "triangle" || o.type === "star") body += `<polygon points="${polygonPoints(o.type, o).map(p => `${p.x},${p.y}`).join(" ")}"${st}${tr}/>`;
+      else if (o.type === "triangle" || o.type === "star") { const pp = polygonPoints(o.type, o).map(p => `${p.x},${p.y}`).join(" "); body += `<polygon points="${pp}"${st}${tr}/>` + svgHatch(o, `<polygon points="${pp}"`, tr); }
+      else if (o.type === "solid3d") body += ee3dSvg(o, tr);
       else if (o.type === "line") {
         const pts = objectEditableStrokePoints(o) || [{ x: o.x1, y: o.y1 }, { x: o.x2, y: o.y2 }];
         body += pts.length > 2
@@ -15597,7 +15660,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
       }
     }
     const styleDef = `<style>text{font-kerning:normal;text-rendering:geometricPrecision}path,line,rect,ellipse,polygon{shape-rendering:geometricPrecision}</style>`;
-    const defs = `<defs>${styleDef}${[...svgHatchDefs.values()].join("")}</defs>`;
+    const defs = `<defs>${styleDef}${[...svgHatchDefs.values()].join("")}${[...eeSvgFillDefs.values()].join("")}</defs>`;
     const widthAttr = physical ? `${journal.widthMm}mm` : String(canvas.width);
     const heightAttr = physical ? `${journal.heightMm}mm` : String(canvas.height);
     const metadata = `<metadata>${svgEscape(JSON.stringify({generator:"EE Canvas Journal Figure Studio",journal:physical?journal:null,canvas:{width:canvas.width,height:canvas.height}}))}</metadata>`;
@@ -16170,6 +16233,14 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
       else if (kind === "poly") { c.beginPath(); for (let x = 2; x < s; x += 5) { c.moveTo(x, 0); c.lineTo(x, s); } c.stroke(); }
       else if (kind === "ntype") { [[3, 3], [9, 9]].forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 1.35, 0, Math.PI * 2); c.fill(); }); }
       else if (kind === "nitride") { c.beginPath(); for (let y = 3; y < s; y += 5) { c.moveTo(0, y); c.lineTo(s, y); } c.stroke(); [[6, 1], [1, 7]].forEach(([x, y]) => { c.beginPath(); c.arc(x, y, 1.1, 0, Math.PI * 2); c.fill(); }); }
+      else if (kind === "dots") { c.beginPath(); c.arc(6, 6, 1.7, 0, Math.PI * 2); c.fill(); }
+      else if (kind === "grid") { c.beginPath(); c.moveTo(.5, 0); c.lineTo(.5, s); c.moveTo(0, .5); c.lineTo(s, .5); c.stroke(); }
+      else if (kind === "checker") { c.globalAlpha = .55; c.fillRect(0, 0, 6, 6); c.fillRect(6, 6, 6, 6); c.globalAlpha = 1; }
+      else if (kind === "bricks") { c.beginPath(); c.moveTo(0, .5); c.lineTo(s, .5); c.moveTo(0, 6.5); c.lineTo(s, 6.5); c.moveTo(.5, 0); c.lineTo(.5, 6); c.moveTo(6.5, 6); c.lineTo(6.5, s); c.stroke(); }
+      else if (kind === "waves") { c.beginPath(); for (const y0 of [3, 9]) { c.moveTo(0, y0); c.bezierCurveTo(3, y0 - 3, 3, y0 - 3, 6, y0); c.bezierCurveTo(9, y0 + 3, 9, y0 + 3, 12, y0); } c.stroke(); }
+      else if (kind === "hlines") { c.beginPath(); c.moveTo(0, 3); c.lineTo(s, 3); c.moveTo(0, 9); c.lineTo(s, 9); c.stroke(); }
+      else if (kind === "vlines") { c.beginPath(); c.moveTo(3, 0); c.lineTo(3, s); c.moveTo(9, 0); c.lineTo(9, s); c.stroke(); }
+      else if (kind === "crosshatch") { c.beginPath(); c.moveTo(0, 6); c.lineTo(s, 6); c.moveTo(6, 0); c.lineTo(6, s); c.stroke(); }
       pat = { canvas: t };
       hatchCache.set(key, pat);
     }
@@ -16178,7 +16249,7 @@ global.MathBox={ mount, autoMount, toLatex, toLatexDoc, toHtml, segment, version
 
   /* fill helper used by the shape branches of drawObject */
   function fillShape(o, c = ctx) {
-    if (o.fill) { c.fillStyle = o.fill; c.fill(); }
+    if (o.fill || (o.fillMode && o.fillMode !== "solid" && o.fillMode !== "pattern")) eeFillCurrentPath(o, c);
     if (o.hatch && o.hatch !== "none") {
       const p = hatchPattern(o.hatch, o.hatchColor || "#475569", c);
       if (p) { const a = c.globalAlpha; c.globalAlpha = a * (o.hatchOpacity ?? .85); c.fillStyle = p; c.fill(); c.globalAlpha = a; }
@@ -20410,9 +20481,11 @@ function dsSetNodeMode(o,index,mode){
   // Actions for it, or Document and Rulers & Grids when nothing is selected.
   var aipUI={ready:false,tool:null,switching:false,ref:'nw',link:true,alignTo:'selection',collapsed:{},zoomDrag:null};
   const AIP_STORE='eeCanvasAiProps';
-  const AIP_TYPE_NAMES={rect:'Rectangle',ellipse:'Ellipse',triangle:'Triangle',star:'Star',line:'Line',arrow:'Arrow',bezier:'Path',path:'Path',text:'Type',equation:'Equation',image:'Image'};
+  const AIP_TYPE_NAMES={solid3d:'3D Object',rect:'Rectangle',ellipse:'Ellipse',triangle:'Triangle',star:'Star',line:'Line',arrow:'Arrow',bezier:'Path',path:'Path',text:'Type',equation:'Equation',image:'Image'};
   const AIP_TEXT_TYPES=new Set(['text','equation']);
   const AIP_ICONS={
+    solid3d:'<path d="M12 3 20 7.5v9L12 21 4 16.5v-9Z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/>',
+    orbit3d:'<path d="M12 4 18 7.5v7L12 18 6 14.5v-7Z"/><path d="M6 7.5 12 11l6-3.5M12 11v7"/><path d="M3 12c0 4 4 7.5 9 7.5 2.2 0 4.2-.6 5.8-1.7" fill="none"/><path d="m17 16 1.2 2.2-2.4.6"/>',
     link:'<path d="M9.5 14.5 14.5 9.5"/><path d="M11 6.5 13 4.5a3.5 3.5 0 0 1 5 5l-2 2"/><path d="m13 17.5-2 2a3.5 3.5 0 0 1-5-5l2-2"/>',
     angle:'<path d="M4 19h16"/><path d="M4 19 15 6"/><path d="M10 19a6 6 0 0 0-1.8-4.3"/>',
     flipH:'<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M9 7 3 17h6Z"/><path d="M15 7l6 10h-6Z"/>',
@@ -20478,7 +20551,7 @@ function dsSetNodeMode(o,index,mode){
   }
 
   // ----- Eyedropper: copy appearance between objects ----------------------
-  const AIP_SHAPE_KEYS=['stroke','fill','strokeWidth','dash','lineCap','opacity','hatch'];
+  const AIP_SHAPE_KEYS=['stroke','fill','strokeWidth','dash','lineCap','opacity','hatch','hatchColor','hatchOpacity','fillMode','gradient','fillImage'];
   const AIP_TEXT_KEYS=['fill','fontFamily','fontSize','bold','italic','underline'];
   function aipApplyAppearance(src,o){
     if(!src||!o||o===src||o.locked||o.type==='image')return false;
@@ -20726,6 +20799,7 @@ function dsSetNodeMode(o,index,mode){
 
   function aipSync(){
     if(!aipUI?.ready)return;
+    try{eeSync();}catch(err){console.error('[3D/Fill panel]',err);}
     const objs=selectedObjects(),n=objs.length,single=selectedObject(),active=document.activeElement;
     const set=(id,v)=>{const el=$(id);if(el&&el!==active&&String(el.value)!==String(v))el.value=v;};
     const show=(id,v)=>{const el=$(id);if(el)el.hidden=!v;};
@@ -20794,7 +20868,7 @@ function dsSetNodeMode(o,index,mode){
 
   function aipAddToolButtons(){
     const tools=document.querySelector('#dsTools .ds-tools');if(!tools)return;
-    for(const [tool,title] of [['eyedropper','Eyedropper Tool (I)'],['zoom','Zoom Tool (Z)'],['rotate','Rotate Tool (Shift+R)'],['scale','Scale Tool (S)'],['measure','Measure Tool (Shift+M)'],['carrier','Carrier Tool (Shift+C)'],['level','Energy Level Tool (Shift+L)'],['dimension','Dimension Tool (Shift+D)'],['wand','Magic Wand Tool (Y)'],['lasso','Lasso Tool'],['reflect','Reflect Tool'],['shapebuilder','Shape Builder Tool (Shift+M)'],['blend','Blend Tool (W)'],['graph','Graph Tool (J)'],['artboard','Artboard Tool (Shift+O)']]){
+    for(const [tool,title] of [['solid3d','3D Object Tool'],['orbit3d','3D Rotate Tool'],['eyedropper','Eyedropper Tool (I)'],['zoom','Zoom Tool (Z)'],['rotate','Rotate Tool (Shift+R)'],['scale','Scale Tool (S)'],['measure','Measure Tool (Shift+M)'],['carrier','Carrier Tool (Shift+C)'],['level','Energy Level Tool (Shift+L)'],['dimension','Dimension Tool (Shift+D)'],['wand','Magic Wand Tool (Y)'],['lasso','Lasso Tool'],['reflect','Reflect Tool'],['shapebuilder','Shape Builder Tool (Shift+M)'],['blend','Blend Tool (W)'],['graph','Graph Tool (J)'],['artboard','Artboard Tool (Shift+O)']]){
       const b=document.createElement('button');b.type='button';b.dataset.aipTool=tool;b.title=title;b.setAttribute('aria-label',title);b.setAttribute('aria-pressed','false');b.innerHTML=aipIcon(tool);
       b.addEventListener('click',()=>aipSetTool(aipUI.tool===tool&&tool!=='zoom'?null:tool));
       if(tool==='zoom')b.addEventListener('dblclick',()=>{setZoom(1);aipSetTool(null);setStatus('Zoom 100%.');});
@@ -20809,6 +20883,8 @@ function dsSetNodeMode(o,index,mode){
 
   // ===== 7. More Illustrator tools, solid-state tools, and the menu bar =====
   const AIP_TOOL_HELP={
+    solid3d:'3D Object: drag to draw a box, cylinder, cone, sphere, pyramid, prism, torus or device layer stack (choose the shape in Tool Options). Shift keeps the frame square.',
+    orbit3d:'3D Rotate: drag a 3D object to turn it (left/right) and tilt it (up/down). Shift snaps to 15°. Fine-tune the view, perspective, lighting and material in Properties ▸ 3D and Materials.',
     zoom:'Zoom: click to zoom in, Alt-click to zoom out, or drag a rectangle to zoom to that area. Double-click the Zoom tool for 100%.',
     eyedropper:'Eyedropper: click an object to apply its appearance to the selection (or to new drawings when nothing is selected). Alt-click applies the selection’s appearance to the clicked object.',
     rotate:'Rotate: drag to rotate the selection around its origin point (Shift snaps to 45°). Click once to move the origin; Alt-click opens the Rotate dialog.',
@@ -20924,7 +21000,7 @@ function dsSetNodeMode(o,index,mode){
 
   function aipToolDown(e){
     const t=aipUI.tool,p=pointFromEvent(e);
-    if(aipDownExtra(e,p))return;
+    if(aipDownExtra(e,p)||ee3dDown(e,p))return;
     if(['rotate','scale'].includes(t)){
       if(!aipEditable().length){setStatus(`Select objects before using the ${t==='rotate'?'Rotate':'Scale'} tool.`);return;}
       if(e.altKey){aipUI.pivot=p;aipDrawOverlay();aipTransformDialog(t);return;}
@@ -20939,6 +21015,7 @@ function dsSetNodeMode(o,index,mode){
     if(!d.moved&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)<3)return true;
     if(!d.moved&&['rotate','scale'].includes(d.tool)){d.objs=aipEditable();d.starts=d.objs.map(o=>deepClone(o));d.pivot=aipPivotPoint();}
     d.moved=true;d.last=p;
+    if(d.tool==='solid3d'||d.tool==='orbit3d'){ee3dMove(d,raw,e);aipDrawOverlay();return true;}
     if(['rotate','scale'].includes(d.tool))aipTransformFromStarts(d,p,e.shiftKey);
     else if(d.tool==='measure'){aipUI.measure={a:d.start,b:p};aipMeasureReadout();}
     else if(d.tool==='carrier'){const s=clamp(aipNum(aipUI.opts.carrierSize,14),6,60);if(Math.hypot(p.x-d.lastPlaced.x,p.y-d.lastPlaced.y)>=s*1.6)aipPlaceCarrier(d,p);}
@@ -20949,6 +21026,7 @@ function dsSetNodeMode(o,index,mode){
   }
   function aipToolUp(e,cancel){
     const d=aipUI.drag;if(!d||e.pointerId!==d.id)return false;aipUI.drag=null;
+    if(d.tool==='solid3d'||d.tool==='orbit3d'){ee3dUp(d,cancel);aipDrawOverlay();return true;}
     if(cancel){if(d.starts)d.objs.forEach((o,i)=>Object.assign(o,d.starts[i]));render();aipDrawOverlay();return true;}
     if(['rotate','scale'].includes(d.tool)){
       if(d.moved){saveHistory();renderLayers();syncControls();}
@@ -21115,6 +21193,8 @@ function dsSetNodeMode(o,index,mode){
         {l:'Object',sub:[['text','All Text Objects'],['equation','All Equations'],['image','All Images'],['line','All Lines'],['arrow','All Arrows'],['rect','All Rectangles']].map(([t,l])=>({l,f:()=>aipSelect(aipVisible().filter(o=>o.type===t&&!o.locked).map(o=>o.id))}))}
       ],
       Effect:[
+        {l:'3D and Materials',sub:[{l:'Extrude & Bevel',f:()=>ee3dConvert('extrude'),d:!sel},{l:'Revolve',f:()=>ee3dConvert('revolve'),d:!sel},'-',{l:'3D Object Tool',f:()=>aipSetTool('solid3d'),c:aipUI.tool==='solid3d'},{l:'3D Rotate Tool',f:()=>aipSetTool('orbit3d'),c:aipUI.tool==='orbit3d'},'-',{l:'Expand 3D to Paths',f:ee3dExpand,d:!objs.some(o=>o.type==='solid3d')}]},
+        {l:'Fill',sub:[{l:'Gradient Swatches',sub:EE_GRADIENTS.map(g=>({l:g[0],f:()=>eeApplyFill({...eeGradientFromPreset(g),hatch:'none'},g[0]),d:!sel}))},{l:'Pattern',sub:EE_PATTERNS.map(([k,l])=>({l,f:()=>eeApplyFill({fillMode:'pattern',hatch:k,hatchColor:'#475569'},'Pattern '+l),d:!sel}))},{l:'Image Fill…',f:eeChooseFillImage,d:!sel},{l:'Graphic Styles',sub:EE_STYLES.map(([n,p])=>({l:n,f:()=>eeApplyFill(p,n),d:!sel}))},'-',{l:'Solid Fill',f:()=>eeApplyFill({fillMode:'solid',hatch:'none'},'Solid fill'),d:!sel}]},'-',
         {l:'Drop Shadow',f:()=>aipShadow(true),d:!sel},{l:'Remove Drop Shadow',f:()=>aipShadow(false),d:!sel},'-',
         {l:'Opacity',sub:[100,75,50,25].map(v=>({l:v+'%',f:()=>{aipEditable().forEach(o=>o.opacity=v/100);aipCommit();},d:!sel}))},
         {l:'Blending Mode',sub:[['source-over','Normal'],['multiply','Multiply'],['screen','Screen'],['overlay','Overlay'],['darken','Darken'],['lighten','Lighten']].map(([v,l])=>({l,f:()=>{aipEditable().forEach(o=>o.blend=v);aipCommit();},d:!sel}))},
@@ -21277,6 +21357,7 @@ function dsSetNodeMode(o,index,mode){
   // ----- Tool Options content for the active tool -----
   function aipToolOptionsHtml(){
     const t=aipUI.tool,o=aipUI.opts;
+    if(t==='solid3d'||t==='orbit3d')return ee3dToolOptions();
     const sel=(id,val,opts)=>`<select id="${id}">${opts.map(([v,l])=>`<option value="${v}"${v===val?' selected':''}>${l}</option>`).join('')}</select>`;
     if(t==='carrier')return `<div class="aip-grid"><span class="aip-lab">Kind</span><div class="aip-ctl">${sel('aipOptCarrier',o.carrier,[['electron','Electron'],['hole','Hole'],['donor','Ionized donor ⊕'],['acceptor','Ionized acceptor ⊖']])}</div>
       <span class="aip-lab">Style</span><div class="aip-ctl">${sel('aipOptCarrierStyle',o.carrierStyle,[['dot','Dots (● e⁻, ○ h⁺)'],['sign','Signed circles (−/+)']])}</div>
@@ -21290,7 +21371,7 @@ function dsSetNodeMode(o,index,mode){
     return '';
   }
   function aipBindToolOptions(host){
-    const o=aipUI.opts,save=()=>aipStore.save();
+    const o=aipUI.opts,save=()=>aipStore.save();ee3dBindToolOptions(host);
     const on=(id,type,fn)=>host.querySelector('#'+id)?.addEventListener(type,fn);
     on('aipOptCarrier','change',e=>{o.carrier=e.target.value;save();});on('aipOptCarrierStyle','change',e=>{o.carrierStyle=e.target.value;save();});
     on('aipOptCarrierSize','change',e=>{o.carrierSize=clamp(aipNum(e.target.value,14),6,60);e.target.value=o.carrierSize;save();});
@@ -21498,8 +21579,534 @@ function dsSetNodeMode(o,index,mode){
 
   aipInstallInput();
   dsInit();
+  // ===== 9. 3D objects (Illustrator-style 3D and Materials) and rich fills ===========
+  // Fill types: solid, linear/radial gradient, pattern, and image (cover / contain /
+  // stretch / tile) for rectangles, ellipses, polygons and closed paths. 3D objects
+  // ("solid3d"): box, cylinder, cone, sphere, pyramid, prism, torus, extruded and
+  // revolved 2D shapes, and device layer stacks — projected with yaw/pitch/roll,
+  // optional perspective, diffuse + specular lighting, silhouette/crease edges and
+  // optional dashed hidden edges. Everything renders as flat polygons, so SVG export
+  // stays fully editable vector art.
+
+  // ---------- Colour helpers ----------
+  function eeRgb(c){
+    const s=String(c||'').trim();let m=/^#([0-9a-f]{3})$/i.exec(s);
+    if(m)return m[1].split('').map(h=>parseInt(h+h,16));
+    m=/^#([0-9a-f]{6})/i.exec(s);if(m)return [0,2,4].map(i=>parseInt(m[1].slice(i,i+2),16));
+    m=/rgba?\(([^)]+)\)/i.exec(s);if(m)return m[1].split(',').slice(0,3).map(v=>clamp(parseFloat(v)||0,0,255));
+    return [148,163,184];
+  }
+  const eeHex=rgb=>'#'+rgb.map(v=>Math.round(clamp(v,0,255)).toString(16).padStart(2,'0')).join('');
+  const eeRgba=(c,a)=>{const [r,g,b]=eeRgb(c);return `rgba(${r},${g},${b},${a})`;};
+
+  // ---------- Fills ----------
+  const EE_FILL_TYPES=[['solid','Solid'],['linear','Linear'],['radial','Radial'],['pattern','Pattern'],['image','Image']];
+  const EE_IMG_CACHE=new Map();
+  function eeFillImage(src){
+    if(!src)return null;let im=EE_IMG_CACHE.get(src);
+    if(!im){im=new Image();im.onload=()=>{try{render();}catch(_){}};im.src=src;EE_IMG_CACHE.set(src,im);}
+    return im.complete&&im.naturalWidth?im:null;
+  }
+  function eeFillCapable(o){return !!o&&(['rect','ellipse','triangle','star'].includes(o.type)||(o.type==='bezier'&&o.closed)||(dsIsCurve(o)&&o.closed));}
+  function eeStops(g){
+    const st=Array.isArray(g?.stops)&&g.stops.length>=2?g.stops:[{offset:0,color:'#ffffff'},{offset:1,color:'#1e40af'}];
+    return st.map(s=>({offset:clamp(Number(s.offset)||0,0,1),color:s.color||'#000000',opacity:clamp(s.opacity??1,0,1)})).sort((a,b)=>a.offset-b.offset);
+  }
+  function eeGradGeom(o,b){
+    const g=o.gradient||{};
+    if(o.fillMode==='radial'){const cx=b.x+b.w*clamp(g.cx??.5,0,1),cy=b.y+b.h*clamp(g.cy??.5,0,1),r=Math.max(1,Math.hypot(b.w,b.h)/2*clamp(g.radius??.75,.05,3));return {cx,cy,r};}
+    const a=(Number(g.angle)||0)*Math.PI/180,c=boundsCenter(b),L=(Math.abs(b.w*Math.cos(a))+Math.abs(b.h*Math.sin(a)))/2||1;
+    return {x1:c.x-L*Math.cos(a),y1:c.y-L*Math.sin(a),x2:c.x+L*Math.cos(a),y2:c.y+L*Math.sin(a)};
+  }
+  // Fills the current path of context c with o's fill type (solid / gradient / image).
+  function eeFillCurrentPath(o,c=ctx,path=null){
+    const F=()=>path?c.fill(path):c.fill(),C=()=>path?c.clip(path):c.clip();
+    const mode=o.fillMode||'solid';
+    if(mode==='linear'||mode==='radial'){
+      const b=baseBounds(o),G=eeGradGeom(o,b);
+      const gr=mode==='radial'?c.createRadialGradient(G.cx,G.cy,0,G.cx,G.cy,G.r):c.createLinearGradient(G.x1,G.y1,G.x2,G.y2);
+      for(const s of eeStops(o.gradient))gr.addColorStop(s.offset,s.opacity<1?eeRgba(s.color,s.opacity):s.color);
+      c.fillStyle=gr;F();return true;
+    }
+    if(mode==='image'){
+      const fi=o.fillImage||{},im=eeFillImage(fi.src);
+      if(o.fill){c.fillStyle=o.fill;F();}
+      if(!im)return true;
+      const b=baseBounds(o),fit=fi.fit||'cover';
+      c.save();C();const a=c.globalAlpha;c.globalAlpha=a*clamp(fi.opacity??1,0,1);c.shadowColor='transparent';
+      if(fit==='tile'){const s=clamp(fi.scale??1,.05,10),pc=document.createElement('canvas');pc.width=Math.max(1,Math.round(im.naturalWidth*s));pc.height=Math.max(1,Math.round(im.naturalHeight*s));pc.getContext('2d').drawImage(im,0,0,pc.width,pc.height);const p=c.createPattern(pc,'repeat');try{p.setTransform(new DOMMatrix().translate(b.x,b.y));}catch(_){}c.fillStyle=p;c.fillRect(b.x,b.y,b.w,b.h);}
+      else{const r=eeImageRect(b,im.naturalWidth,im.naturalHeight,fit);c.drawImage(im,r.x,r.y,r.w,r.h);}
+      c.globalAlpha=a;c.restore();return true;
+    }
+    if(o.fill){c.fillStyle=o.fill;F();}
+    return true;
+  }
+  function eeImageRect(b,iw,ih,fit){
+    if(fit==='stretch'||!iw||!ih)return {x:b.x,y:b.y,w:b.w,h:b.h};
+    const s=fit==='contain'?Math.min(b.w/iw,b.h/ih):Math.max(b.w/iw,b.h/ih);
+    return {x:b.x+(b.w-iw*s)/2,y:b.y+(b.h-ih*s)/2,w:iw*s,h:ih*s};
+  }
+  // SVG: gradients and image fills become <linearGradient>/<radialGradient>/<pattern> defs.
+  const eeSvgFillDefs=new Map();
+  function eeSvgFill(o){
+    const mode=o.fillMode||'solid';
+    if(mode==='solid'||mode==='pattern'||!eeFillCapable(o))return o.fill||'none';
+    const id=`eef${o.id}`,b=baseBounds(o);
+    if(mode==='linear'||mode==='radial'){
+      const G=eeGradGeom(o,b),stops=eeStops(o.gradient).map(s=>`<stop offset="${s.offset}" stop-color="${s.color}"${s.opacity<1?` stop-opacity="${s.opacity}"`:''}/>`).join('');
+      eeSvgFillDefs.set(id,mode==='radial'?`<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${G.cx}" cy="${G.cy}" r="${G.r}">${stops}</radialGradient>`:`<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${G.x1}" y1="${G.y1}" x2="${G.x2}" y2="${G.y2}">${stops}</linearGradient>`);
+      return `url(#${id})`;
+    }
+    const fi=o.fillImage||{};if(!fi.src)return o.fill||'none';
+    const im=eeFillImage(fi.src),iw=im?.naturalWidth||b.w,ih=im?.naturalHeight||b.h,fit=fi.fit||'cover',op=clamp(fi.opacity??1,0,1);
+    const bg=o.fill?`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${o.fill}"/>`:'';
+    if(fit==='tile'){const s=clamp(fi.scale??1,.05,10);eeSvgFillDefs.set(id,`<pattern id="${id}" patternUnits="userSpaceOnUse" x="${b.x}" y="${b.y}" width="${iw*s}" height="${ih*s}"><image href="${fi.src}" width="${iw*s}" height="${ih*s}" opacity="${op}"/></pattern>`);return `url(#${id})`;}
+    const r=eeImageRect(b,iw,ih,fit);
+    eeSvgFillDefs.set(id,`<pattern id="${id}" patternUnits="userSpaceOnUse" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}">${bg.replace(`x="${b.x}" y="${b.y}"`,'x="0" y="0"')}<image href="${fi.src}" x="${r.x-b.x}" y="${r.y-b.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="none" opacity="${op}"/></pattern>`);
+    return `url(#${id})`;
+  }
+
+  // Swatches, patterns and graphic styles (Illustrator Swatches / Graphic Styles panels).
+  const EE_GRADIENTS=[
+    ['Silicon wafer','linear',90,[['#8b97a8',0],['#e7ebf1',.5],['#7d8a9c',1]]],
+    ['Aluminium','linear',90,[['#aeb6bf',0],['#f4f6f8',.45],['#9aa3ad',1]]],
+    ['Copper','linear',90,[['#9a5a2b',0],['#f2b98a',.5],['#8a4a1d',1]]],
+    ['Gold','linear',90,[['#a6761d',0],['#ffe08a',.5],['#a17012',1]]],
+    ['Oxide glass','linear',90,[['#eff6ff',0],['#bfdbfe',1]]],
+    ['n-type','linear',90,[['#dbeafe',0],['#3b82f6',1]]],
+    ['p-type','linear',90,[['#fee2e2',0],['#ef4444',1]]],
+    ['Depletion','linear',0,[['#fde68a',0],['#fef3c7',.5],['#fde68a',1]]],
+    ['Thermal map','linear',0,[['#1e3a8a',0],['#22c55e',.38],['#facc15',.7],['#dc2626',1]]],
+    ['Sky','linear',90,[['#bae6fd',0],['#ffffff',1]]],
+    ['Sunset','linear',90,[['#f97316',0],['#fb7185',.55],['#7c3aed',1]]],
+    ['Slate','linear',90,[['#475569',0],['#0f172a',1]]],
+    ['Glow','radial',0,[['#ffffff',0],['#93c5fd',.55],['#1d4ed8',1]]],
+    ['Sphere shade','radial',0,[['#ffffff',0],['#94a3b8',.6],['#334155',1]],{cx:.35,cy:.32,radius:.8}],
+    ['Spotlight','radial',0,[['#fef9c3',0],['#fef9c3',.25],['#fef9c300',1]]],
+    ['Fade out','linear',0,[['#2563eb',0],['#2563eb00',1]]]
+  ];
+  const EE_PATTERNS=[['oxide','Oxide ///'],['substrate','Substrate \\\\\\'],['metal','Metal ###'],['poly','Poly |||'],['ntype','n dots'],['ptype','p cross'],['nitride','Nitride'],['dots','Dots'],['grid','Grid'],['checker','Checker'],['bricks','Bricks'],['waves','Waves'],['hlines','Horizontal lines'],['vlines','Vertical lines'],['crosshatch','Cross-hatch']];
+  const EE_STYLES=[
+    ['Device layer',{fillMode:'linear',gradient:{angle:90,stops:[{offset:0,color:'#e2e8f0'},{offset:1,color:'#94a3b8'}]},stroke:'#1e293b',strokeWidth:1.5,shadow:{enabled:false}}],
+    ['Card with shadow',{fillMode:'solid',fill:'#ffffff',stroke:'#cbd5e1',strokeWidth:1,shadow:{enabled:true,blur:14,color:'#0f172a55',x:0,y:6}}],
+    ['Glass panel',{fillMode:'linear',gradient:{angle:120,stops:[{offset:0,color:'#ffffff',opacity:.85},{offset:1,color:'#bfdbfe',opacity:.35}]},stroke:'#60a5fa',strokeWidth:1.2,shadow:{enabled:false}}],
+    ['Callout',{fillMode:'solid',fill:'#fef9c3',stroke:'#a16207',strokeWidth:1.5,shadow:{enabled:false}}],
+    ['Metal contact',{fillMode:'linear',gradient:{angle:90,stops:[{offset:0,color:'#aeb6bf'},{offset:.45,color:'#f4f6f8'},{offset:1,color:'#9aa3ad'}]},stroke:'#334155',strokeWidth:1.5,hatch:'none'}],
+    ['Hatched oxide',{fillMode:'pattern',fill:'#f8fafc',hatch:'oxide',hatchColor:'#64748b',stroke:'#334155',strokeWidth:1.2}],
+    ['Embossed',{fillMode:'radial',gradient:{cx:.35,cy:.3,radius:.9,stops:[{offset:0,color:'#ffffff'},{offset:1,color:'#cbd5e1'}]},stroke:'#64748b',strokeWidth:1,shadow:{enabled:true,blur:6,color:'#0f172a40',x:2,y:3}}]
+  ];
+  function eeGradientFromPreset(p){const [,mode,angle,stops,extra]=p;return {fillMode:mode,gradient:{angle,...(extra||{}),stops:stops.map(([c,off])=>({offset:off,color:c.length>7?c.slice(0,7):c,opacity:c.length>7?parseInt(c.slice(7),16)/255:1}))}};}
+  function eeApplyFill(props,label){
+    const objs=aipEditable().filter(eeFillCapable);
+    if(!objs.length){setStatus('Select a rectangle, ellipse, polygon or closed path to apply a fill.');return;}
+    for(const o of objs){for(const [k,v] of Object.entries(props))o[k]=deepClone(v);if(props.shadow)o.shadow={blur:0,color:'#000000',x:0,y:0,...(o.shadow||{}),...props.shadow};if(props.fillMode&&props.fillMode!=='pattern'&&!('hatch' in props))o.hatch='none';}
+    aipCommit();setStatus(`${label} applied to ${objs.length} object${objs.length>1?'s':''}.`);
+  }
+  // A neutral "drop an image here" placeholder, used by the image-frame template.
+  const EE_IMAGE_PLACEHOLDER='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260"><rect width="400" height="260" fill="#e2e8f0"/><path d="M0 220 120 110l80 70 60-50 140 90v60H0Z" fill="#94a3b8"/><circle cx="300" cy="70" r="30" fill="#cbd5e1"/></svg>');
+  function eeChooseFillImage(){
+    const inp=document.createElement('input');inp.type='file';inp.accept='image/png,image/jpeg,image/webp,image/gif,image/svg+xml';
+    inp.onchange=()=>{const f=inp.files?.[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{eeApplyFill({fillMode:'image',fillImage:{src:String(rd.result),fit:(selectedObject()?.fillImage?.fit)||'cover',opacity:1,scale:1}},'Image fill');eeFillImage(String(rd.result));};rd.readAsDataURL(f);};
+    inp.click();
+  }
+
+  // ---------- 3D engine ----------
+  const EE3D_KINDS={box:'Box',cylinder:'Cylinder',cone:'Cone',sphere:'Sphere',pyramid:'Pyramid',prism:'Prism',torus:'Torus',stack:'Layer stack',extrude:'Extruded shape',revolve:'Revolved shape'};
+  const EE3D_PRIMS=['box','cylinder','cone','sphere','pyramid','prism','torus','stack'];
+  const EE3D_VIEWS={iso:['Isometric',-45,35.264,0],dimetric:['Dimetric',-30,20,0],trimetric:['Trimetric',-25,30,0],offaxis:['Off-axis front',-18,14,0],front:['Front',0,0,0],top:['Top',0,90,0],right:['Right side',-90,0,0],cabinet:['Cabinet',-38,24,0]};
+  // k = ambient + diffuse·(N·L) + head·N_z (camera fill light, as Illustrator keeps viewer-facing faces readable) + specular highlight
+  const EE3D_MATERIALS={plastic:['Plastic',{ambient:.42,diffuse:.5,head:.32,specular:.3,shininess:24,alpha:1}],matte:['Matte',{ambient:.46,diffuse:.46,head:.3,specular:0,shininess:1,alpha:1}],metal:['Metal',{ambient:.3,diffuse:.45,head:.36,specular:.85,shininess:60,alpha:1}],glass:['Glass',{ambient:.6,diffuse:.25,head:.2,specular:.7,shininess:80,alpha:.42}]};
+  const EE3D_STACKS={
+    mos:[['p-Si substrate','#cbd5e1',3],['SiO₂ gate oxide','#bfdbfe',.45],['n+ poly-Si gate','#fca5a5',1],['Al contact','#94a3b8',.6]],
+    solar:[['Ag back contact','#9ca3af',.7],['n-Si emitter','#93c5fd',.6],['p-Si absorber','#fecaca',2.2],['ITO','#fde68a',.35],['Glass','#e0f2fe',1]],
+    capacitor:[['Bottom plate (Cu)','#d9a066',.5],['Dielectric','#c7d2fe',1.2],['Top plate (Cu)','#d9a066',.5]],
+    oled:[['Glass substrate','#e0f2fe',1],['ITO anode','#fde68a',.3],['HTL','#bbf7d0',.4],['Emissive layer','#f0abfc',.5],['ETL','#a5f3fc',.4],['Al cathode','#9ca3af',.5]]
+  };
+  function eeSolidDefaults(kind){
+    const base={kind,yaw:-45,pitch:35.264,roll:0,persp:0,sy:1,sz:1,segments:48,material:'plastic',style:'shaded',showHidden:false,lightAz:-40,lightEl:45,lightI:1,tube:.32,sides:6,stackKey:'mos'};
+    if(kind==='cylinder'||kind==='cone'){base.sy=1.2;base.sz=1;}
+    if(kind==='prism'){base.sy=1.1;base.segments=6;}
+    if(kind==='sphere')base.segments=32;
+    if(kind==='torus'){base.sy=.4;base.sz=1;base.pitch=30;}
+    if(kind==='stack'){base.layers=EE3D_STACKS.mos.map(([name,color,t])=>({name,color,t}));base.sy=.8;base.sz=.7;base.yaw=-32;base.pitch=24;base.material='matte';}
+    return base;
+  }
+  // Mesh: {v:[[x,y,z]], f:[{i:[...], color?, ref?:[x,y,z]}]} in model units (width 1 along x).
+  function eeMesh(sd){
+    const v=[],f=[],add=p=>(v.push(p),v.length-1);
+    const k=sd.kind,sx=1,sy=Math.max(.02,+sd.sy||1),sz=Math.max(.02,+sd.sz||1);
+    const ring=(n,rx,rz,y,phase=0)=>{const ids=[];for(let i=0;i<n;i++){const a=phase+i/n*Math.PI*2;ids.push(add([rx*Math.cos(a),y,-rz*Math.sin(a)]));}return ids;};
+    if(k==='box'||k==='stack'){
+      const boxAt=(y0,y1,color)=>{const x=sx/2,z=sz/2,p=[[-x,y0,z],[x,y0,z],[x,y1,z],[-x,y1,z],[-x,y0,-z],[x,y0,-z],[x,y1,-z],[-x,y1,-z]].map(add);
+        [[0,1,2,3],[5,4,7,6],[1,5,6,2],[4,0,3,7],[3,2,6,7],[4,5,1,0]].forEach(q=>f.push({i:q.map(j=>p[j]),color,ref:[0,(y0+y1)/2,0]}));};
+      if(k==='box')boxAt(-sy/2,sy/2,null);
+      else{const L=(Array.isArray(sd.layers)&&sd.layers.length?sd.layers:EE3D_STACKS.mos.map(([name,color,t])=>({name,color,t})));const tot=L.reduce((a,l)=>a+Math.max(.01,+l.t||0),0)||1;let y=-sy/2;for(const l of L){const h=sy*Math.max(.01,+l.t||0)/tot;boxAt(y,y+h,l.color||null);y+=h;}}
+    }else if(k==='cylinder'||k==='prism'||k==='cone'){
+      const n=k==='prism'?clamp(Math.round(+sd.segments||6),3,24):clamp(Math.round(+sd.segments||32),8,96),ph=k==='prism'?Math.PI/n+Math.PI/2:0;
+      const bot=ring(n,sx/2,sz/2,-sy/2,ph);
+      if(k==='cone'){const apex=add([0,sy/2,0]);for(let i=0;i<n;i++)f.push({i:[bot[i],bot[(i+1)%n],apex]});}
+      else{const top=ring(n,sx/2,sz/2,sy/2,ph);for(let i=0;i<n;i++)f.push({i:[bot[i],bot[(i+1)%n],top[(i+1)%n],top[i]]});f.push({i:[...top]});}
+      f.push({i:[...bot].reverse()});
+    }else if(k==='pyramid'){
+      const x=sx/2,z=sz/2,b=[[-x,-sy/2,z],[x,-sy/2,z],[x,-sy/2,-z],[-x,-sy/2,-z]].map(add),a=add([0,sy/2,0]);
+      for(let i=0;i<4;i++)f.push({i:[b[i],b[(i+1)%4],a]});f.push({i:[b[3],b[2],b[1],b[0]]});
+    }else if(k==='sphere'){
+      const lat=16,lon=Math.max(12,Math.round((+sd.segments||32)));const rows=[];
+      for(let i=0;i<=lat;i++){const t=-Math.PI/2+i/lat*Math.PI;rows.push(i===0||i===lat?[add([0,sy/2*Math.sin(t),0])]:ring(lon,sx/2*Math.cos(t),sz/2*Math.cos(t),sy/2*Math.sin(t)));}
+      for(let i=0;i<lat;i++)for(let j=0;j<lon;j++){const A=rows[i],B=rows[i+1];const a=A[A.length===1?0:j],b=A[A.length===1?0:(j+1)%lon],c=B[B.length===1?0:(j+1)%lon],d=B[B.length===1?0:j];f.push({i:[...new Set([a,b,c,d])]});}
+    }else if(k==='torus'){
+      const n=clamp(Math.round(+sd.segments||32),12,64),m=16,r=clamp(+sd.tube||.32,.05,.48)*sx/2,R=sx/2-r,grid=[];
+      for(let i=0;i<n;i++){const a=i/n*Math.PI*2,row=[];for(let j=0;j<m;j++){const b=j/m*Math.PI*2,rr=R+r*Math.cos(b);row.push(add([rr*Math.cos(a),r*Math.sin(b)*sy/.4,-rr*Math.sin(a)*(sz||1)]));}grid.push(row);}
+      for(let i=0;i<n;i++)for(let j=0;j<m;j++){const a=(i/n+.5/n)*Math.PI*2;f.push({i:[grid[i][j],grid[i][(j+1)%m],grid[(i+1)%n][(j+1)%m],grid[(i+1)%n][j]],ref:[R*Math.cos(a),0,-R*Math.sin(a)*(sz||1)]});}
+    }else if(k==='extrude'){
+      let P=Array.isArray(sd.profile)&&sd.profile.length>=3?sd.profile:[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]];
+      // keep the profile counter-clockwise (y up) so cap normals point outward
+      let area=0;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];area+=a[0]*b[1]-b[0]*a[1];}if(area<0)P=[...P].reverse();
+      const n=P.length,fr=P.map(([x,y])=>add([x,y,sz/2])),bk=P.map(([x,y])=>add([x,y,-sz/2]));
+      for(let i=0;i<n;i++){const j=(i+1)%n,dx=P[j][0]-P[i][0],dy=P[j][1]-P[i][1];f.push({i:[fr[i],bk[i],bk[j],fr[j]],out:[dy,-dx,0]});}
+      f.push({i:[...fr],cap:true});f.push({i:[...bk].reverse(),cap:true});
+    }else if(k==='revolve'){
+      const P=Array.isArray(sd.profile)&&sd.profile.length>=2?sd.profile:[[0,.5],[.3,.4],[.22,0],[.4,-.5]],n=clamp(Math.round(+sd.segments||36),8,96),rows=[];
+      for(const [r,y] of P){const rr=Math.max(0,r)*sx;rows.push(rr<1e-4?[add([0,y,0])]:ring(n,rr,rr*(sz||1),y));}
+      for(let i=0;i<rows.length-1;i++)for(let j=0;j<n;j++){const A=rows[i],B=rows[i+1];const ids=[A[A.length===1?0:j],A[A.length===1?0:(j+1)%n],B[B.length===1?0:(j+1)%n],B[B.length===1?0:j]];f.push({i:[...new Set(ids)],ref:[0,(v[ids[0]][1]+v[ids[2]][1])/2,0]});}
+    }
+    // Outward orientation: flip faces whose Newell normal points toward their reference point.
+    const c0=v.reduce((a,p)=>[a[0]+p[0]/v.length,a[1]+p[1]/v.length,a[2]+p[2]/v.length],[0,0,0]);
+    for(const face of f){
+      const ids=face.i;if(ids.length<3)continue;
+      const nrm=eeNewell(ids.map(i=>v[i])),ct=ids.reduce((a,i)=>[a[0]+v[i][0]/ids.length,a[1]+v[i][1]/ids.length,a[2]+v[i][2]/ids.length],[0,0,0]);
+      if(face.cap)continue;
+      if(face.out){if(nrm[0]*face.out[0]+nrm[1]*face.out[1]+nrm[2]*face.out[2]<0)face.i=[...ids].reverse();continue;}
+      const ref=face.ref||c0;
+      if(nrm[0]*(ct[0]-ref[0])+nrm[1]*(ct[1]-ref[1])+nrm[2]*(ct[2]-ref[2])<0)face.i=[...ids].reverse();
+    }
+    return {v,f};
+  }
+  function eeNewell(P){let x=0,y=0,z=0;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];x+=(a[1]-b[1])*(a[2]+b[2]);y+=(a[2]-b[2])*(a[0]+b[0]);z+=(a[0]-b[0])*(a[1]+b[1]);}const l=Math.hypot(x,y,z)||1;return [x/l,y/l,z/l];}
+  function eeRotate(p,sd){
+    const yw=-(+sd.yaw||0)*Math.PI/180,pt=(+sd.pitch||0)*Math.PI/180,rl=(+sd.roll||0)*Math.PI/180;
+    let [x,y,z]=p;
+    let x1=x*Math.cos(yw)+z*Math.sin(yw),z1=-x*Math.sin(yw)+z*Math.cos(yw);x=x1;z=z1;           // yaw about Y
+    let y1=y*Math.cos(pt)-z*Math.sin(pt),z2=y*Math.sin(pt)+z*Math.cos(pt);y=y1;z=z2;            // pitch about X (top toward viewer)
+    const x2=x*Math.cos(rl)-y*Math.sin(rl),y2=x*Math.sin(rl)+y*Math.cos(rl);return [x2,y2,z];    // roll about Z
+  }
+  // Projects a solid into draw primitives fitted (contain) into its frame.
+  function eeSolidPrims(o){
+    const sd={...eeSolidDefaults(o.solid?.kind||'box'),...(o.solid||{})},mesh=eeMesh(sd),mat=EE3D_MATERIALS[sd.material]?.[1]||EE3D_MATERIALS.plastic[1];
+    const R=mesh.v.map(p=>eeRotate(p,sd)),persp=clamp(+sd.persp||0,0,1),D=persp>0?2.6/persp:0;
+    const P=R.map(([x,y,z])=>{const k=D?D/Math.max(.2,D-z):1;return [x*k,-y*k,z];});
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const p of P){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);}
+    const bw=Math.max(1e-6,x1-x0),bh=Math.max(1e-6,y1-y0),s=Math.min(Math.abs(o.w)/bw,Math.abs(o.h)/bh);
+    const ox=o.x+(o.w-bw*s)/2-x0*s,oy=o.y+(o.h-bh*s)/2-y0*s,S=P.map(p=>[ox+p[0]*s,oy+p[1]*s,p[2]]);
+    const az=(+sd.lightAz||0)*Math.PI/180,el=(+sd.lightEl||45)*Math.PI/180,L=[Math.cos(el)*Math.sin(az),Math.sin(el),Math.cos(el)*Math.cos(az)];
+    const H=(()=>{const h=[L[0],L[1],L[2]+1],l=Math.hypot(...h)||1;return h.map(q=>q/l);})(),I=clamp(+sd.lightI||1,0,2);
+    const base=eeRgb(o.fill||'#93c5fd'),style=sd.style||'shaded';
+    const faces=mesh.f.filter(fc=>fc.i.length>=3).map(fc=>{
+      const n=eeNewell(fc.i.map(i=>R[i])),viewN=persp?(()=>{const c=fc.i.reduce((a,i)=>[a[0]+R[i][0],a[1]+R[i][1],a[2]+R[i][2]],[0,0,0]).map(q=>q/fc.i.length);const e=[-c[0],-c[1],D-c[2]];return n[0]*e[0]+n[1]*e[1]+n[2]*e[2];})():n[2];
+      return {...fc,n,front:viewN>1e-9,z:fc.i.reduce((a,i)=>a+R[i][2],0)/fc.i.length};
+    });
+    // Edge adjacency for silhouettes, creases and boundaries.
+    const edges=new Map();faces.forEach((fc,fi)=>fc.i.forEach((a,j)=>{const b=fc.i[(j+1)%fc.i.length],key=a<b?a+'_'+b:b+'_'+a;(edges.get(key)||edges.set(key,[]).get(key)).push(fi);}));
+    const crease=Math.cos(38*Math.PI/180);
+    const feature=(fi,a,b)=>{const key=a<b?a+'_'+b:b+'_'+a,adj=edges.get(key)||[];if(adj.length<2)return true;const g=faces[adj[0]===fi?adj[1]:adj[0]],fc=faces[fi];if(g.front!==fc.front)return true;return fc.n[0]*g.n[0]+fc.n[1]*g.n[1]+fc.n[2]*g.n[2]<crease;};
+    const shade=(fc)=>{
+      const col=fc.color?eeRgb(fc.color):base;if(style==='flat'){const k=.82+.18*Math.max(0,fc.n[0]*L[0]+fc.n[1]*L[1]+fc.n[2]*L[2]);return eeHex(col.map(c=>c*k));}
+      const d=Math.max(0,fc.n[0]*L[0]+fc.n[1]*L[1]+fc.n[2]*L[2]),sp=mat.specular*Math.pow(Math.max(0,fc.n[0]*H[0]+fc.n[1]*H[1]+fc.n[2]*H[2]),mat.shininess)*I;
+      const k=mat.ambient+mat.diffuse*d*I+(mat.head||0)*Math.max(0,fc.n[2]);return eeHex(col.map(c=>c*k+255*sp));
+    };
+    const ops=[],xray=style==='xray',wire=style==='wire',alpha=xray?.32:mat.alpha;
+    const order=faces.map((fc,i)=>i).filter(i=>xray||wire||faces[i].front||alpha<1).sort((a,b)=>faces[a].z-faces[b].z);
+    for(const fi of order){
+      const fc=faces[fi],pts=fc.i.map(i=>S[i]);
+      if(!wire)ops.push({t:'face',pts,fill:shade(fc),alpha:fc.front?alpha:alpha*.6});
+      if(fc.front||xray)for(let j=0;j<fc.i.length;j++){const a=fc.i[j],b=fc.i[(j+1)%fc.i.length];if(feature(fi,a,b)&&(fc.front||xray))ops.push({t:'edge',a:S[a],b:S[b],hidden:!fc.front});}
+    }
+    if(sd.showHidden||wire){const seen=new Set();faces.forEach((fc,fi)=>{if(fc.front)return;fc.i.forEach((a,j)=>{const b=fc.i[(j+1)%fc.i.length],key=a<b?a+'_'+b:b+'_'+a;if(seen.has(key))return;seen.add(key);const adj=edges.get(key)||[];if(adj.some(x=>faces[x].front))return;if(feature(fi,a,b))ops.push({t:'edge',a:S[a],b:S[b],hidden:true});});});}
+    return {ops,scale:s,bw,bh,sd,ox,oy,D};
+  }
+  // Screen position of a model-space point, using the same fit as the drawing.
+  function ee3dProject(o,pt){const {scale,ox,oy,D,sd}=eeSolidPrims(o),[x,y,z]=eeRotate(pt,sd),k=D?D/Math.max(.2,D-z):1;return {x:ox+x*k*scale,y:oy-y*k*scale};}
+  function ee3dDraw(c,o){
+    const {ops}=eeSolidPrims(o),edgeCol=o.stroke||'#1f2937',ew=Math.max(0,+o.strokeWidth||0);
+    c.save();c.lineJoin='round';c.lineCap='round';const a0=c.globalAlpha;
+    // One drop shadow for the whole object (not one per face), then faces without shadow.
+    if(c.shadowColor&&c.shadowColor!=='transparent'&&c.shadowColor!=='rgba(0, 0, 0, 0)'&&(c.shadowBlur||c.shadowOffsetX||c.shadowOffsetY)){
+      c.beginPath();for(const op of ops)if(op.t==='face'){op.pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();}
+      c.fillStyle=o.fill||'#93c5fd';c.fill('nonzero');}
+    c.shadowColor='transparent';c.shadowBlur=0;c.shadowOffsetX=0;c.shadowOffsetY=0;
+    for(const op of ops){
+      if(op.t==='face'){c.beginPath();op.pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.globalAlpha=a0*op.alpha;c.fillStyle=op.fill;c.fill();
+        // seal hairline gaps between adjacent faces
+        if(op.alpha>=1){c.lineWidth=.6;c.strokeStyle=op.fill;c.setLineDash([]);c.stroke();}
+        c.globalAlpha=a0;}
+      else if(ew>0||op.hidden){c.beginPath();c.moveTo(op.a[0],op.a[1]);c.lineTo(op.b[0],op.b[1]);c.strokeStyle=edgeCol;c.lineWidth=op.hidden?Math.max(.6,ew*.7||.8):ew;c.setLineDash(op.hidden?[4,3]:[]);c.globalAlpha=a0*(op.hidden?.7:1);c.stroke();c.globalAlpha=a0;}
+    }
+    c.setLineDash([]);c.restore();
+  }
+  function ee3dSvg(o,tr){
+    const {ops}=eeSolidPrims(o),edgeCol=o.stroke||'#1f2937',ew=Math.max(0,+o.strokeWidth||0),f=n=>+n.toFixed(2),parts=[];
+    for(const op of ops){
+      if(op.t==='face')parts.push(`<path d="M${op.pts.map(p=>`${f(p[0])} ${f(p[1])}`).join('L')}Z" fill="${op.fill}"${op.alpha<1?` fill-opacity="${+op.alpha.toFixed(3)}"`:` stroke="${op.fill}" stroke-width=".6"`}/>`);
+      else if(ew>0||op.hidden)parts.push(`<path d="M${f(op.a[0])} ${f(op.a[1])}L${f(op.b[0])} ${f(op.b[1])}" stroke="${edgeCol}" stroke-width="${op.hidden?Math.max(.6,ew*.7||.8):ew}"${op.hidden?' stroke-dasharray="4 3" stroke-opacity=".7"':''} fill="none" stroke-linecap="round"/>`);
+    }
+    const sh=o.shadow?.enabled?` style="filter:drop-shadow(${o.shadow.x||0}px ${o.shadow.y||0}px ${o.shadow.blur||0}px ${o.shadow.color||'#000'})"`:'';
+    return `<g opacity="${o.opacity??1}"${sh}${tr}>${parts.join('')}</g>`;
+  }
+  // Keep the frame hugging the projected drawing after a view change (same scale, same centre).
+  function ee3dRefit(o,prevScale){
+    const c=boundsCenter(baseBounds(o)),probe={...o,x:0,y:0,w:1000,h:1000},{bw,bh}=eeSolidPrims(probe);
+    const s=prevScale??eeSolidPrims(o).scale;o.w=Math.max(8,bw*s);o.h=Math.max(8,bh*s);o.x=c.x-o.w/2;o.y=c.y-o.h/2;
+  }
+  function ee3dMake(kind,rect,extra={}){
+    const fill={box:'#93c5fd',cylinder:'#86efac',cone:'#fca5a5',sphere:'#c4b5fd',pyramid:'#fde68a',prism:'#99f6e4',torus:'#f9a8d4',stack:'#cbd5e1',extrude:'#93c5fd',revolve:'#a5b4fc'}[kind]||'#93c5fd';
+    const o={type:'solid3d',name:EE3D_KINDS[kind]||'3D Object',...tBase('#1f2937',fill,1.2),x:rect.x,y:rect.y,w:rect.w,h:rect.h,solid:{...eeSolidDefaults(kind),...extra}};
+    return o;
+  }
+  // Object ▸ 3D and Materials ▸ Extrude & Bevel / Revolve: convert 2D shapes.
+  function ee3dProfileOf(o){
+    const b=baseBounds(o);let pts=null;
+    if(o.type==='rect')pts=[{x:o.x,y:o.y},{x:o.x+o.w,y:o.y},{x:o.x+o.w,y:o.y+o.h},{x:o.x,y:o.y+o.h}];
+    else if(o.type==='ellipse')pts=Array.from({length:48},(_,i)=>{const a=i/48*Math.PI*2;return {x:o.x+o.w/2+o.w/2*Math.cos(a),y:o.y+o.h/2+o.h/2*Math.sin(a)};});
+    else if(o.type==='triangle'||o.type==='star')pts=polygonPoints(o.type,o);
+    else if(o.type==='bezier')pts=objectCurveRenderPoints(o);
+    else if(o.type==='path'||o.type==='line'||dsIsCurve(o))pts=Array.isArray(o.points)?o.points.map(p=>({x:p.x,y:p.y})):(objectEditableStrokePoints(o)||null);
+    if(!pts||pts.length<2)return null;
+    return {b,pts};
+  }
+  function ee3dConvert(mode){
+    const objs=aipEditable();const out=[];
+    for(const o of objs){
+      const pr=ee3dProfileOf(o);if(!pr)continue;const {b,pts}=pr,W=Math.max(1,b.w),Hh=Math.max(1,b.h);
+      if(mode==='extrude'){
+        if(pts.length<3)continue;
+        const profile=pts.map(p=>[(p.x-b.x)/W-.5,(Hh/W)*(.5-(p.y-b.y)/Hh)]);
+        const n=ee3dMake('extrude',b,{profile,sz:clamp(.35*Math.max(W,Hh)/W,.05,4),yaw:-28,pitch:22,style:'shaded'});n.fill=o.fill&&o.fill!=='transparent'?o.fill:'#93c5fd';n.stroke=o.stroke||'#1f2937';n.strokeWidth=Math.max(.8,Math.min(2,o.strokeWidth||1.2));n.name=(o.name||AIP_TYPE_NAMES[o.type]||'Shape')+' (3D extrude)';out.push([o,n]);
+      }else{
+        // Revolve around the profile's left edge (Illustrator's default axis).
+        const profile=pts.map(p=>[(p.x-b.x)/W,(Hh/W)*(.5-(p.y-b.y)/Hh)]);
+        const n=ee3dMake('revolve',{x:b.x-b.w,y:b.y,w:b.w*2,h:b.h},{profile:profile.map(([r,y])=>[r*.5,y*.5]),sz:1,yaw:0,pitch:18,segments:40});n.fill=o.fill&&o.fill!=='transparent'?o.fill:(o.stroke||'#a5b4fc');n.stroke='#1f2937';n.strokeWidth=0;n.name=(o.name||'Shape')+' (3D revolve)';out.push([o,n]);
+      }
+    }
+    if(!out.length){setStatus(mode==='extrude'?'Select a rectangle, ellipse, polygon or closed path to extrude.':'Select a line, path or shape profile to revolve.');return;}
+    for(const [o,n] of out){n.id=uid();n.groupId=o.groupId;const i=state.objects.indexOf(o);state.objects.splice(i,1,n);ee3dRefit(n,eeSolidPrims(n).scale);}
+    state.selectedIds=out.map(([,n])=>n.id);aipCommit();ee3dRevealPanel();setStatus(`${out.length} object${out.length>1?'s':''} converted to 3D (${mode==='extrude'?'Extrude & Bevel':'Revolve'}). Use Properties ▸ 3D to rotate and light it.`);
+  }
+  // Expand: 3D object → editable 2D faces and edges (Illustrator Object ▸ Expand Appearance).
+  function ee3dExpand(){
+    const sel=aipEditable().filter(o=>o.type==='solid3d');if(!sel.length){setStatus('Select a 3D object to expand.');return;}
+    const ids=[];
+    for(const o of sel){
+      const {ops}=eeSolidPrims(o),g=gid(),parts=[];
+      for(const op of ops){
+        if(op.t==='face')parts.push({type:'path',name:'3D face',points:op.pts.map(p=>({x:p[0],y:p[1]})),closed:true,...tBase('none',op.fill,0),opacity:(o.opacity??1)*op.alpha});
+        else if((o.strokeWidth||0)>0||op.hidden)parts.push({type:'line',name:op.hidden?'Hidden edge':'Edge',x1:op.a[0],y1:op.a[1],x2:op.b[0],y2:op.b[1],...tBase(o.stroke||'#1f2937',null,op.hidden?Math.max(.6,(o.strokeWidth||1)*.7):o.strokeWidth),dash:op.hidden?[4,3]:[]});
+      }
+      for(const p of parts){p.id=uid();p.groupId=g;p.groupLabel=o.name||'3D object';}
+      const i=state.objects.indexOf(o);state.objects.splice(i,1,...parts);ids.push(...parts.map(p=>p.id));
+    }
+    state.selectedIds=ids;aipCommit();setStatus('3D object expanded into editable faces and edges (grouped).');
+  }
+
+  // ---------- Tools: 3D Object (drag to create) and 3D Rotate (drag to orbit) ----------
+  function ee3dDown(e,p){
+    if(aipUI.tool==='orbit3d'){
+      const hit=hitTest(p.x,p.y),o=hit&&hit.type==='solid3d'&&!hit.locked?hit:(selectedObject()?.type==='solid3d'?selectedObject():null);
+      if(!o){setStatus('3D Rotate: drag on a 3D object (create one with the 3D Object tool, or Object ▸ 3D and Materials).');return true;}
+      if(!state.selectedIds.includes(o.id))aipSelect([o.id]);
+      aipUI.drag={tool:'orbit3d',id:e.pointerId,start:p,last:p,moved:false,obj:o,startSolid:deepClone(o.solid),startFrame:{x:o.x,y:o.y,w:o.w,h:o.h},scale:eeSolidPrims(o).scale};
+      try{canvas.setPointerCapture(e.pointerId);}catch(_){}return true;
+    }
+    return false;
+  }
+  function ee3dMove(d,raw,e){
+    if(d.tool==='orbit3d'){
+      const o=d.obj,sd=o.solid;let yaw=d.startSolid.yaw+(raw.x-d.start.x)*.5,pitch=clamp(d.startSolid.pitch+(raw.y-d.start.y)*.5,-90,90);
+      if(e.shiftKey){yaw=Math.round(yaw/15)*15;pitch=Math.round(pitch/15)*15;}
+      sd.yaw=Math.round(((yaw+540)%360-180)*10)/10;sd.pitch=Math.round(pitch*10)/10;ee3dRefit(o,d.scale);render();aipSync();
+      setStatus(`3D rotate · yaw ${sd.yaw.toFixed(1)}° · pitch ${sd.pitch.toFixed(1)}°${e.shiftKey?' (15° steps)':''}`,900);return;
+    }
+    if(d.tool==='solid3d')d.rect=aipRect(d.start,raw,e.shiftKey);
+  }
+  function ee3dUp(d,cancel){
+    if(d.tool==='orbit3d'){if(cancel){Object.assign(d.obj,d.startFrame);d.obj.solid=d.startSolid;render();}else if(d.moved){saveHistory();renderLayers();syncControls();}return;}
+    if(d.tool==='solid3d'&&!cancel){
+      const kind=EE3D_KINDS[aipUI.opts.solidKind]?aipUI.opts.solidKind:'box';
+      const r=d.moved&&d.rect&&d.rect.w>8&&d.rect.h>8?d.rect:{x:d.start.x-80,y:d.start.y-80,w:160,h:160};
+      const o=ee3dMake(kind,r,kind==='stack'?{layers:(EE3D_STACKS[aipUI.opts.stackKey]||EE3D_STACKS.mos).map(([name,color,t])=>({name,color,t})),stackKey:aipUI.opts.stackKey||'mos'}:{});
+      const ids=aipAddObjects([o],o.name);state.selectedIds=ids;saveHistory();render();renderLayers();syncControls();ee3dRevealPanel();
+      setStatus(`${o.name} created. Drag with the 3D Rotate tool, or use Properties ▸ 3D, to change the view.`);
+    }
+  }
+  function ee3dRevealPanel(){
+    try{aipShowPanel('inspectorPanel');const sec=$('ee3dSec');if(sec?.classList.contains('is-collapsed'))sec.querySelector('.aip-sec-head')?.click();}catch(_){}
+  }
+  function ee3dToolOptions(){
+    const o=aipUI.opts,sel=(id,val,opts)=>`<select id="${id}">${opts.map(([v,l])=>`<option value="${v}"${v===val?' selected':''}>${l}</option>`).join('')}</select>`;
+    if(aipUI.tool==='solid3d')return `<div class="aip-grid"><span class="aip-lab">Shape</span><div class="aip-ctl">${sel('aipOptSolid',o.solidKind||'box',EE3D_PRIMS.map(k=>[k,EE3D_KINDS[k]]))}</div>
+      <span class="aip-lab">Stack</span><div class="aip-ctl">${sel('aipOptStack',o.stackKey||'mos',[['mos','MOS gate stack'],['solar','Si solar cell'],['capacitor','Parallel-plate capacitor'],['oled','OLED stack']])}</div></div>`;
+    if(aipUI.tool==='orbit3d')return '<p class="aip-note">Drag a 3D object: left/right turns it (yaw), up/down tilts it (pitch). Shift snaps to 15°.</p>';
+    return '';
+  }
+  function ee3dBindToolOptions(host){
+    host.querySelector('#aipOptSolid')?.addEventListener('change',e=>{aipUI.opts.solidKind=e.target.value;aipStore.save();});
+    host.querySelector('#aipOptStack')?.addEventListener('change',e=>{aipUI.opts.stackKey=e.target.value;aipStore.save();});
+  }
+
+  // ---------- Properties ▸ Fill and Properties ▸ 3D ----------
+  const eeUI={built:false};
+  function eeInitPanels(){
+    const root=$('aipRoot'),app=$('aipAppearance');if(!root||!app||eeUI.built)return;eeUI.built=true;
+    const opt=(arr,cur)=>arr.map(([v,l])=>`<option value="${v}"${v===cur?' selected':''}>${l}</option>`).join('');
+    const fillHtml=`<div class="ee-seg" id="eeFillType" role="radiogroup" aria-label="Fill type">${EE_FILL_TYPES.map(([v,l])=>`<button type="button" data-v="${v}" role="radio">${l}</button>`).join('')}</div>
+      <div id="eeGradBox"><div class="ee-gbar" id="eeGradBar" title="Click to add a colour stop"></div><div id="eeStops"></div>
+        <div class="aip-row"><label class="aip-f" id="eeAngleRow"><span>Angle:</span><input id="eeGAngle" type="number" step="5"></label><span class="aip-unit" id="eeAngleUnit">°</span>
+        <span id="eeRadialRow"><label class="aip-f"><span>X:</span><input id="eeGcx" type="number" min="0" max="100" step="5"></label><label class="aip-f"><span>Y:</span><input id="eeGcy" type="number" min="0" max="100" step="5"></label><label class="aip-f"><span>R:</span><input id="eeGr" type="number" min="5" max="300" step="5"></label></span>
+        <button type="button" class="aip-link-btn" id="eeGRev" title="Reverse gradient">Reverse</button></div></div>
+      <div id="eePatBox" class="aip-grid"><span class="aip-lab">Pattern</span><div class="aip-ctl"><select id="eePat">${opt([['none','None'],...EE_PATTERNS],'oxide')}</select><label class="aip-swatch" title="Pattern colour"><input id="eePatCol" type="color"><i></i></label></div>
+        <span class="aip-lab">Opacity</span><div class="aip-ctl"><input id="eePatOp" type="number" min="5" max="100" step="5"><span class="aip-unit">%</span></div></div>
+      <div id="eeImgBox"><div class="aip-row aip-actions"><button type="button" id="eeImgPick">Choose image…</button><button type="button" id="eeImgClear">Remove</button></div>
+        <div class="aip-grid"><span class="aip-lab">Fit</span><div class="aip-ctl"><select id="eeImgFit">${opt([['cover','Fill frame (crop)'],['contain','Fit inside'],['stretch','Stretch'],['tile','Tile']],'cover')}</select></div>
+        <span class="aip-lab">Tile size</span><div class="aip-ctl"><input id="eeImgScale" type="number" min="5" max="1000" step="5"><span class="aip-unit">%</span></div>
+        <span class="aip-lab">Opacity</span><div class="aip-ctl"><input id="eeImgOp" type="number" min="5" max="100" step="5"><span class="aip-unit">%</span></div></div></div>
+      <div class="aip-sub">Swatches</div><div class="ee-swatches" id="eeSwatches">${EE_GRADIENTS.map((g,i)=>`<button type="button" data-g="${i}" title="${g[0]}" style="background:${g[1]==='radial'?`radial-gradient(circle at ${((g[4]?.cx??.5)*100)}% ${((g[4]?.cy??.5)*100)}%, `:`linear-gradient(${g[2]+90}deg, `}${g[3].map(([c,o])=>`${c} ${o*100}%`).join(',')})"></button>`).join('')}</div>
+      <div class="ee-swatches ee-pats" id="eePatSwatches">${EE_PATTERNS.slice(0,15).map(([k,l])=>`<button type="button" data-p="${k}" title="${l}"><canvas width="26" height="26"></canvas></button>`).join('')}</div>
+      <div class="aip-sub">Graphic styles</div><div class="ee-styles" id="eeStyles">${EE_STYLES.map(([n],i)=>`<button type="button" data-s="${i}">${n}</button>`).join('')}</div>`;
+    const mk=(id,title,body)=>{const w=document.createElement('div');w.innerHTML=aipSection(id,title,body);return w.firstElementChild;};
+    const fillSec=mk('eeFillSec','Fill',fillHtml);app.after(fillSec);
+    const views=Object.entries(EE3D_VIEWS).map(([k,[l]])=>`<button type="button" data-view="${k}">${l}</button>`).join('');
+    const sec3=mk('ee3dSec','3D and Materials',`<div class="aip-grid"><span class="aip-lab">Shape</span><div class="aip-ctl"><select id="ee3Kind"></select></div>
+      <span class="aip-lab">Style</span><div class="aip-ctl"><select id="ee3Style">${opt([['shaded','Shaded'],['flat','Flat (technical)'],['wire','Wireframe'],['xray','X-ray']],'shaded')}</select></div>
+      <span class="aip-lab">Material</span><div class="aip-ctl"><select id="ee3Mat">${opt(Object.entries(EE3D_MATERIALS).map(([k,[l]])=>[k,l]),'plastic')}</select><label class="ee-chk"><input type="checkbox" id="ee3Hidden"> Hidden edges</label></div></div>
+      <div class="aip-sub">View</div><div class="ee-views" id="ee3Views">${views}</div>
+      <div class="ee-pad" id="ee3Pad" title="Drag to rotate (Shift: 15° steps)"><svg viewBox="0 0 120 70" aria-hidden="true"><ellipse cx="60" cy="35" rx="52" ry="26" fill="none" stroke="currentColor" stroke-dasharray="3 3" opacity=".45"/><path d="M60 5v60M8 35h104" stroke="currentColor" opacity=".25"/><circle id="ee3PadDot" r="5" fill="currentColor"/></svg><span>drag to rotate</span></div>
+      <div class="aip-xywh ee-3num"><label class="aip-f"><span>Yaw</span><input id="ee3Yaw" type="number" step="5"></label><label class="aip-f"><span>Pitch</span><input id="ee3Pitch" type="number" min="-90" max="90" step="5"></label><label class="aip-f"><span>Roll</span><input id="ee3Roll" type="number" step="5"></label></div>
+      <div class="ee-sl"><label>Perspective<input id="ee3Persp" type="range" min="0" max="100" step="1"></label><label>Depth<input id="ee3Depth" type="range" min="5" max="300" step="1"></label><label id="ee3HRow">Height<input id="ee3H" type="range" min="5" max="300" step="1"></label><label id="ee3SegRow">Segments<input id="ee3Seg" type="range" min="3" max="64" step="1"></label></div>
+      <div class="aip-sub">Lighting</div><div class="ee-sl"><label>Direction<input id="ee3LAz" type="range" min="-180" max="180" step="5"></label><label>Height<input id="ee3LEl" type="range" min="0" max="90" step="5"></label><label>Intensity<input id="ee3LI" type="range" min="0" max="200" step="5"></label></div>
+      <div id="ee3StackBox"><div class="aip-sub">Layers (bottom → top)</div><div id="ee3Layers"></div><div class="aip-row aip-actions"><button type="button" id="ee3AddLayer">Add layer</button><select id="ee3StackPreset">${opt([['','Load preset…'],['mos','MOS gate stack'],['solar','Si solar cell'],['capacitor','Capacitor'],['oled','OLED stack']],'')}</select></div></div>
+      <p class="aip-note">Edges use the Stroke colour and weight (set Stroke to 0 for edgeless shading). Base colour is the Fill swatch.</p>
+      <div class="aip-row aip-actions"><button type="button" id="ee3Expand" title="Convert to editable 2D faces and edges">Expand</button><button type="button" id="ee3Hug" title="Fit the frame to the drawing">Fit frame</button></div>`);
+    fillSec.after(sec3);
+    [fillSec,sec3].forEach(sec=>{const head=sec.querySelector('.aip-sec-head'),set=c=>{sec.classList.toggle('is-collapsed',c);head.setAttribute('aria-expanded',String(!c));};set(!!aipUI.collapsed[sec.id]);head.addEventListener('click',()=>{const c=!sec.classList.contains('is-collapsed');aipUI.collapsed[sec.id]=c;set(c);aipStore.save();});});
+    // pattern swatch thumbnails
+    fillSec.querySelectorAll('#eePatSwatches button').forEach(b=>{const cv=b.querySelector('canvas'),c=cv.getContext('2d');c.fillStyle='#ffffff';c.fillRect(0,0,26,26);const p=hatchPattern(b.dataset.p,'#475569',c);if(p){c.fillStyle=p;c.fillRect(0,0,26,26);}});
+    eeBindPanels();
+  }
+  function eeEach(fn,filter=eeFillCapable){const objs=aipEditable().filter(filter);if(!objs.length)return false;objs.forEach(fn);aipCommit();return true;}
+  function eeSolidEdit(fn,{refit=false,commit=true}={}){const objs=aipEditable().filter(o=>o.type==='solid3d');if(!objs.length)return;for(const o of objs){const s=eeSolidPrims(o).scale;o.solid={...eeSolidDefaults(o.solid?.kind||'box'),...(o.solid||{})};fn(o.solid,o);if(refit)ee3dRefit(o,s);}if(commit)aipCommit();else{render();}}
+  function eeBindPanels(){
+    const on=(id,ev,fn)=>$(id)?.addEventListener(ev,fn);
+    $('eeFillType').addEventListener('click',e=>{const b=e.target.closest('button[data-v]');if(!b)return;const v=b.dataset.v;
+      eeEach(o=>{o.fillMode=v==='pattern'?'pattern':v;if((v==='linear'||v==='radial')&&!o.gradient)o.gradient={angle:90,cx:.5,cy:.5,radius:.75,stops:[{offset:0,color:'#ffffff'},{offset:1,color:o.fill&&o.fill!=='transparent'?o.fill:'#1e40af'}]};
+        if(v==='pattern'&&(!o.hatch||o.hatch==='none')){o.hatch='oxide';o.hatchColor=o.hatchColor||'#475569';}if(v!=='pattern'&&v!=='solid')o.hatch='none';if(v==='solid')o.hatch=o.hatch||'none';
+        if(v==='image'&&!o.fillImage?.src)setTimeout(eeChooseFillImage,0);})||setStatus('Select a rectangle, ellipse, polygon or closed path.');});
+    const grad=fn=>eeEach(o=>{o.gradient={angle:90,cx:.5,cy:.5,radius:.75,...(o.gradient||{}),stops:eeStops(o.gradient)};fn(o.gradient,o);});
+    on('eeGAngle','change',e=>grad(g=>{g.angle=aipNum(e.target.value,0);}));
+    on('eeGcx','change',e=>grad(g=>{g.cx=clamp(aipNum(e.target.value,50)/100,0,1);}));on('eeGcy','change',e=>grad(g=>{g.cy=clamp(aipNum(e.target.value,50)/100,0,1);}));on('eeGr','change',e=>grad(g=>{g.radius=clamp(aipNum(e.target.value,75)/100,.05,3);}));
+    on('eeGRev','click',()=>grad(g=>{g.stops=g.stops.map(s=>({...s,offset:1-s.offset})).reverse();}));
+    on('eeGradBar','click',e=>{const r=e.currentTarget.getBoundingClientRect(),t=clamp((e.clientX-r.left)/r.width,0,1);grad(g=>{if(g.stops.length>=6)return;const sorted=eeStops(g),i=sorted.findIndex(s=>s.offset>t);const a=sorted[Math.max(0,i-1)]||sorted[0],b=sorted[i<0?sorted.length-1:i];const k=(t-a.offset)/((b.offset-a.offset)||1),ca=eeRgb(a.color),cb=eeRgb(b.color);g.stops=[...sorted,{offset:t,color:eeHex(ca.map((c,j)=>c+(cb[j]-c)*k)),opacity:1}].sort((x,y)=>x.offset-y.offset);});});
+    $('eeStops').addEventListener('change',e=>{const row=e.target.closest('[data-i]');if(!row)return;const i=+row.dataset.i;grad(g=>{const s=g.stops[i];if(!s)return;if(e.target.matches('input[type=color]'))s.color=e.target.value;else if(e.target.dataset.k==='off')s.offset=clamp(aipNum(e.target.value,0)/100,0,1);else if(e.target.dataset.k==='op')s.opacity=clamp(aipNum(e.target.value,100)/100,0,1);g.stops=eeStops(g);});});
+    $('eeStops').addEventListener('click',e=>{const b=e.target.closest('button[data-del]');if(!b)return;grad(g=>{if(g.stops.length>2)g.stops.splice(+b.dataset.del,1);});});
+    on('eePat','change',e=>eeEach(o=>{o.fillMode='pattern';o.hatch=e.target.value;}));on('eePatCol','input',e=>eeEach(o=>{o.hatchColor=e.target.value;}));
+    on('eePatOp','change',e=>eeEach(o=>{o.hatchOpacity=clamp(aipNum(e.target.value,85)/100,.05,1);}));
+    on('eeImgPick','click',eeChooseFillImage);on('eeImgClear','click',()=>eeEach(o=>{o.fillMode='solid';delete o.fillImage;}));
+    const img=fn=>eeEach(o=>{o.fillImage={fit:'cover',opacity:1,scale:1,...(o.fillImage||{})};fn(o.fillImage);});
+    on('eeImgFit','change',e=>img(f=>{f.fit=e.target.value;}));on('eeImgScale','change',e=>img(f=>{f.scale=clamp(aipNum(e.target.value,100)/100,.05,10);}));on('eeImgOp','change',e=>img(f=>{f.opacity=clamp(aipNum(e.target.value,100)/100,.05,1);}));
+    $('eeSwatches').addEventListener('click',e=>{const b=e.target.closest('[data-g]');if(!b)return;const p=EE_GRADIENTS[+b.dataset.g];eeApplyFill({...eeGradientFromPreset(p),hatch:'none'},p[0]);});
+    $('eePatSwatches').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(!b)return;eeApplyFill({fillMode:'pattern',hatch:b.dataset.p,hatchColor:selectedObject()?.hatchColor||'#475569'},'Pattern '+b.title);});
+    $('eeStyles').addEventListener('click',e=>{const b=e.target.closest('[data-s]');if(!b)return;const [n,props]=EE_STYLES[+b.dataset.s];eeApplyFill(props,`Graphic style “${n}”`);});
+    // 3D
+    on('ee3Kind','change',e=>eeSolidEdit((sd,o)=>{const k=e.target.value;const keep={yaw:sd.yaw,pitch:sd.pitch,roll:sd.roll,persp:sd.persp,material:sd.material,style:sd.style,lightAz:sd.lightAz,lightEl:sd.lightEl,lightI:sd.lightI,profile:sd.profile};Object.assign(sd,eeSolidDefaults(k),keep);sd.kind=k;o.name=EE3D_KINDS[k];},{refit:true}));
+    on('ee3Style','change',e=>eeSolidEdit(sd=>{sd.style=e.target.value;}));on('ee3Mat','change',e=>eeSolidEdit(sd=>{sd.material=e.target.value;}));
+    on('ee3Hidden','change',e=>eeSolidEdit(sd=>{sd.showHidden=e.target.checked;}));
+    $('ee3Views').addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(!b)return;const [,yaw,pitch,roll]=EE3D_VIEWS[b.dataset.view];eeSolidEdit(sd=>{sd.yaw=yaw;sd.pitch=pitch;sd.roll=roll;},{refit:true});});
+    for(const [id,k,lo,hi] of [['ee3Yaw','yaw',-180,180],['ee3Pitch','pitch',-90,90],['ee3Roll','roll',-180,180]])on(id,'change',e=>eeSolidEdit(sd=>{sd[k]=clamp(aipNum(e.target.value,0),lo,hi);},{refit:true}));
+    const live=(id,fn,refit=false)=>{on(id,'input',e=>eeSolidEdit(sd=>fn(sd,+e.target.value),{refit,commit:false}));on(id,'change',()=>aipCommit());};
+    live('ee3Persp',(sd,v)=>{sd.persp=v/100;},true);live('ee3Depth',(sd,v)=>{sd.sz=v/100;},true);live('ee3H',(sd,v)=>{sd.sy=v/100;},true);live('ee3Seg',(sd,v)=>{sd.segments=v;});
+    live('ee3LAz',(sd,v)=>{sd.lightAz=v;});live('ee3LEl',(sd,v)=>{sd.lightEl=v;});live('ee3LI',(sd,v)=>{sd.lightI=v/100;});
+    on('ee3Expand','click',ee3dExpand);on('ee3Hug','click',()=>eeSolidEdit(()=>{},{refit:true}));
+    // rotate pad
+    const pad=$('ee3Pad');let pd=null;
+    pad.addEventListener('pointerdown',e=>{const o=selectedObject();if(!o||o.type!=='solid3d')return;pd={x:e.clientX,y:e.clientY,yaw:o.solid.yaw,pitch:o.solid.pitch,s:eeSolidPrims(o).scale};pad.setPointerCapture(e.pointerId);e.preventDefault();});
+    pad.addEventListener('pointermove',e=>{if(!pd)return;const o=selectedObject();if(!o||o.type!=='solid3d')return;let yaw=pd.yaw+(e.clientX-pd.x)*1.2,pitch=clamp(pd.pitch+(e.clientY-pd.y)*1.2,-90,90);if(e.shiftKey){yaw=Math.round(yaw/15)*15;pitch=Math.round(pitch/15)*15;}o.solid.yaw=Math.round(((yaw+540)%360-180)*10)/10;o.solid.pitch=Math.round(pitch*10)/10;ee3dRefit(o,pd.s);render();eeSync();});
+    const padUp=()=>{if(pd){pd=null;aipCommit();}};pad.addEventListener('pointerup',padUp);pad.addEventListener('pointercancel',padUp);
+    // stack layers
+    $('ee3Layers').addEventListener('change',e=>{const row=e.target.closest('[data-i]');if(!row)return;const i=+row.dataset.i;eeSolidEdit(sd=>{const L=sd.layers=(sd.layers||[]).map(l=>({...l}));const l=L[i];if(!l)return;const k=e.target.dataset.k;if(k==='color')l.color=e.target.value;else if(k==='name')l.name=e.target.value.slice(0,40);else if(k==='t')l.t=clamp(aipNum(e.target.value,1),.01,100);},{refit:true});});
+    $('ee3Layers').addEventListener('click',e=>{const b=e.target.closest('button[data-act]');if(!b)return;const i=+b.closest('[data-i]').dataset.i,act=b.dataset.act;eeSolidEdit(sd=>{const L=sd.layers=(sd.layers||[]).map(l=>({...l}));if(act==='del'&&L.length>1)L.splice(i,1);if(act==='up'&&i<L.length-1)[L[i],L[i+1]]=[L[i+1],L[i]];if(act==='down'&&i>0)[L[i],L[i-1]]=[L[i-1],L[i]];},{refit:true});});
+    on('ee3AddLayer','click',()=>eeSolidEdit(sd=>{sd.layers=[...(sd.layers||[]),{name:'New layer',color:'#e2e8f0',t:.5}];},{refit:true}));
+    on('ee3StackPreset','change',e=>{const k=e.target.value;if(!k)return;eeSolidEdit(sd=>{sd.layers=EE3D_STACKS[k].map(([name,color,t])=>({name,color,t}));sd.stackKey=k;},{refit:true});e.target.value='';});
+  }
+  function eeSync(){
+    if(!eeUI.built)return;
+    const objs=selectedObjects(),fillObjs=objs.filter(eeFillCapable),o=fillObjs[0],solid=objs.find(x=>x.type==='solid3d'),act=document.activeElement;
+    const set=(id,v)=>{const el=$(id);if(el&&el!==act&&String(el.value)!==String(v))el.value=v;};
+    $('eeFillSec').hidden=!o;$('ee3dSec').hidden=!solid;
+    if(o){
+      const mode=o.fillMode||((o.hatch&&o.hatch!=='none')?'pattern':'solid');
+      $('eeFillType').querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.v===mode)));
+      $('eeGradBox').hidden=!(mode==='linear'||mode==='radial');$('eePatBox').hidden=mode!=='pattern';$('eeImgBox').hidden=mode!=='image';
+      if(mode==='linear'||mode==='radial'){
+        const g=o.gradient||{},st=eeStops(g);$('eeGradBar').style.background=`linear-gradient(90deg,${st.map(s=>`${s.opacity<1?eeRgba(s.color,s.opacity):s.color} ${s.offset*100}%`).join(',')})`;
+        $('eeAngleRow').hidden=$('eeAngleUnit').hidden=mode!=='linear';$('eeRadialRow').hidden=mode!=='radial';
+        set('eeGAngle',Math.round(+g.angle||0));set('eeGcx',Math.round((g.cx??.5)*100));set('eeGcy',Math.round((g.cy??.5)*100));set('eeGr',Math.round((g.radius??.75)*100));
+        const host=$('eeStops');if(!host.contains(act))host.innerHTML=st.map((s,i)=>`<div class="ee-stop" data-i="${i}"><label class="aip-swatch" style="--sw:${s.color}"><input type="color" value="${eeHex(eeRgb(s.color))}"><i></i></label><label class="aip-f"><span>at</span><input data-k="off" type="number" min="0" max="100" step="1" value="${Math.round(s.offset*100)}"></label><span class="aip-unit">%</span><label class="aip-f"><span>α</span><input data-k="op" type="number" min="0" max="100" step="5" value="${Math.round(s.opacity*100)}"></label>${st.length>2?`<button type="button" class="aip-ib" data-del="${i}" title="Remove stop">×</button>`:''}</div>`).join('');
+      }
+      if(mode==='pattern'){set('eePat',o.hatch||'none');set('eePatCol',eeHex(eeRgb(o.hatchColor||'#475569')));$('eePatCol').parentElement.style.setProperty('--sw',o.hatchColor||'#475569');set('eePatOp',Math.round((o.hatchOpacity??.85)*100));}
+      if(mode==='image'){const f=o.fillImage||{};set('eeImgFit',f.fit||'cover');set('eeImgScale',Math.round((f.scale??1)*100));set('eeImgOp',Math.round((f.opacity??1)*100));}
+    }
+    if(solid){
+      const sd={...eeSolidDefaults(solid.solid?.kind||'box'),...(solid.solid||{})},k=sd.kind;
+      const kinds=k==='extrude'||k==='revolve'?[k,...EE3D_PRIMS]:EE3D_PRIMS;const ks=$('ee3Kind');if(ks!==act){ks.innerHTML=kinds.map(x=>`<option value="${x}"${x===k?' selected':''}>${EE3D_KINDS[x]}</option>`).join('');}
+      set('ee3Style',sd.style);set('ee3Mat',sd.material);if($('ee3Hidden')!==act)$('ee3Hidden').checked=!!sd.showHidden;
+      set('ee3Yaw',+(+sd.yaw).toFixed(1));set('ee3Pitch',+(+sd.pitch).toFixed(1));set('ee3Roll',+(+sd.roll).toFixed(1));
+      set('ee3Persp',Math.round(sd.persp*100));set('ee3Depth',Math.round(sd.sz*100));set('ee3H',Math.round(sd.sy*100));set('ee3Seg',sd.segments);
+      set('ee3LAz',sd.lightAz);set('ee3LEl',sd.lightEl);set('ee3LI',Math.round(sd.lightI*100));
+      $('ee3HRow').hidden=k==='extrude'||k==='revolve';$('ee3SegRow').hidden=!['cylinder','cone','sphere','prism','torus','revolve'].includes(k);
+      const dot=$('ee3PadDot');if(dot){dot.setAttribute('cx',60+52*Math.sin(-sd.yaw*Math.PI/180));dot.setAttribute('cy',35+26*Math.sin(-sd.pitch*Math.PI/180)*-1);}
+      $('ee3StackBox').hidden=k!=='stack';
+      if(k==='stack'){const host=$('ee3Layers');if(!host.contains(act)){const L=sd.layers||[];host.innerHTML=L.map((l,i)=>({l,i})).reverse().map(({l,i})=>`<div class="ee-layer" data-i="${i}"><label class="aip-swatch" style="--sw:${l.color}"><input type="color" data-k="color" value="${eeHex(eeRgb(l.color))}"><i></i></label><input data-k="name" type="text" value="${escapeHtmlAttr(l.name||'')}" aria-label="Layer name"><input data-k="t" type="number" min=".01" step=".1" value="${+(+l.t).toFixed(2)}" title="Relative thickness" aria-label="Relative thickness"><button type="button" class="aip-ib" data-act="up" title="Move up">↑</button><button type="button" class="aip-ib" data-act="down" title="Move down">↓</button><button type="button" class="aip-ib" data-act="del" title="Delete layer">×</button></div>`).join('');}}
+    }
+  }
+
+  // ---------- Template Library entries ----------
+  function ee3dTpl(kind,x,y,w,h,extra={},fill){const o=ee3dMake(kind,{x,y,w,h},extra);if(fill)o.fill=fill;return o;}
+  function buildEe3dPrimitives(){
+    const o=[tText('3D primitives',0,8,900,40,28,'#0f172a','center','Title')];
+    EE3D_PRIMS.filter(k=>k!=='stack').forEach((k,i)=>{const x=20+i*126;o.push(ee3dTpl(k,x,70,110,120));o.push(tText(EE3D_KINDS[k],x-5,198,120,24,16,'#334155','center',EE3D_KINDS[k]+' label'));});
+    return {width:900,height:240,objects:o};
+  }
+  function buildEe3dStack(key,title){return ()=>{const L=EE3D_STACKS[key];const o=[tText(title,0,6,760,40,28,'#0f172a','center','Title'),ee3dTpl('stack',40,70,420,300,{layers:L.map(([name,color,t])=>({name,color,t})),stackKey:key})];
+    // layer labels to the right, bottom to top
+    const st=o[1],sd={...eeSolidDefaults('stack'),...st.solid},tot=L.reduce((a,l)=>a+l[2],0);let y0=-sd.sy/2,lastY=-1e9;
+    const rows=L.map(([name,,t])=>{const h=sd.sy*t/tot,pt=ee3dProject(st,[.5,y0+h/2,sd.sz/2]);y0+=h;return {name,pt};});
+    // Bottom-to-top layers project upward; space labels at least 24 px apart.
+    rows.map((r,i)=>({...r,i})).sort((a,b)=>b.pt.y-a.pt.y).forEach(r=>{let ly=r.pt.y;if(lastY>-1e9&&lastY-ly<24)ly=lastY-24;lastY=ly;
+      o.push(tLine(r.pt.x+4,r.pt.y,500,ly,'#64748b',1.2,r.name+' leader'),tText(r.name,508,ly-11,250,22,17,'#334155','left',r.name+' label'));});
+    return {width:760,height:400,objects:o};};}
+  function buildEeWaferDie(){
+    const wafer=ee3dTpl('cylinder',40,90,520,250,{sy:.04,sz:1,yaw:-30,pitch:58,segments:72,material:'metal'},'#a8b3c2');
+    const die=ee3dTpl('box',245,140,110,80,{sy:.12,sz:1,yaw:-30,pitch:58,material:'plastic'},'#1e293b');
+    return {width:600,height:380,objects:[tText('Wafer and die (3D)',0,10,600,40,28,'#0f172a','center','Title'),wafer,die]};
+  }
+  function buildEeFillBoard(){
+    const o=[tText('Fill swatches — gradients, patterns and image',0,6,960,40,26,'#0f172a','center','Title')];
+    EE_GRADIENTS.slice(0,12).forEach((g,i)=>{const x=20+(i%6)*156,y=60+Math.floor(i/6)*130,r=tRect(x,y,140,90,'#ffffff',g[0],'#334155',1,10);Object.assign(r,eeGradientFromPreset(g));o.push(r,tText(g[0],x,y+94,140,22,14,'#334155','center',g[0]+' label'));});
+    EE_PATTERNS.slice(7,13).forEach(([k,l],i)=>{const x=20+i*156,y=330,r=tRect(x,y,140,90,'#f8fafc',l,'#334155',1,10);Object.assign(r,{fillMode:'pattern',hatch:k,hatchColor:'#475569',hatchOpacity:.85});o.push(r,tText(l,x,y+94,140,22,14,'#334155','center',l+' label'));});
+    return {width:960,height:460,objects:o};
+  }
+  function buildEeImageFrame(){
+    const f=tRect(30,60,540,320,'#e2e8f0','Image frame','#64748b',1.5,18);Object.assign(f,{fillMode:'image',fillImage:{src:EE_IMAGE_PLACEHOLDER,fit:'cover',opacity:1,scale:1}});
+    const c=tEllipse(600,90,260,260,'#e2e8f0','Round image frame','#64748b',1.5);Object.assign(c,{fillMode:'image',fillImage:{src:EE_IMAGE_PLACEHOLDER,fit:'cover',opacity:1,scale:1}});
+    return {width:900,height:420,objects:[tText('Image frames — select and use Properties ▸ Fill ▸ Choose image…',0,8,900,36,22,'#0f172a','center','Title'),f,c]};
+  }
+  function buildEe3dCapacitor(){
+    const o=[tText('Parallel-plate capacitor (3D)',0,8,700,40,28,'#0f172a','center','Title'),ee3dTpl('stack',60,70,380,280,{layers:EE3D_STACKS.capacitor.map(([name,color,t])=>({name,color,t})),stackKey:'capacitor',sy:.5,sz:.8,yaw:-34,pitch:28,material:'metal'})];
+    o.push(tText('+Q',470,120,80,30,24,'#b91c1c','left','+Q label'),tText('−Q',470,270,80,30,24,'#1d4ed8','left','−Q label'),tText('ε_r',470,195,80,30,24,'#334155','left','Dielectric label'));
+    return {width:700,height:380,objects:o};
+  }
+
   aipAddToolButtons();
   aipInit();
+  eeInitPanels();
   aimInit();
   aipTaskBarInit();
 
@@ -23231,6 +23838,8 @@ window.addEventListener('DOMContentLoaded',()=>{
  const store={get(k,d){try{return localStorage.getItem(k)??d;}catch(_){return d;}},set(k,v){try{localStorage.setItem(k,v);}catch(_){}}};
  const fire=el=>el?.dispatchEvent(new Event('change',{bubbles:true}));
  const ICON={
+  solid3d:'<path d="M12 3 20 7.5v9L12 21 4 16.5v-9Z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/>',
+  orbit3d:'<path d="M12 4 18 7.5v7L12 18 6 14.5v-7Z"/><path d="M6 7.5 12 11l6-3.5M12 11v7"/><path d="M3 12c0 4 4 7.5 9 7.5 2.2 0 4.2-.6 5.8-1.7" fill="none"/><path d="m17 16 1.2 2.2-2.4.6"/>',
   select:'<path d="M7 3.5v15.2l3.9-3.6 2.6 5.9 2.4-1.1-2.6-5.8 5.3-.4Z" fill="currentColor" stroke-width="1"/>',
   nodes:'<path d="M7 3.5v15.2l3.9-3.6 2.6 5.9 2.4-1.1-2.6-5.8 5.3-.4Z" stroke-width="1.3"/>',
   pen:'<path d="M12 3.5 7 13.2 9.4 19h5.2l2.4-5.8Z"/><path d="M12 3.5v7.2"/><circle cx="12" cy="12.4" r="1.5"/><path d="M9.2 21.2h5.6"/>',
@@ -23302,6 +23911,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   [['te:text','Type Tool','T'],['te:heading','Heading Tool',''],['te:equation','Equation Tool','Q'],['te:boxed','Boxed Result Tool','']],
   [['line','Line Segment Tool','L'],['arrow','Arrow Tool','A'],['dimension','Dimension Tool','Shift+D']],
   [['rect','Rectangle Tool','R'],['ellipse','Ellipse Tool','O'],['triangle','Triangle Tool',''],['star','Star Tool','']],[['paintbrush','Paintbrush Tool','Shift+B']],
+  [['solid3d','3D Object Tool',''],['orbit3d','3D Rotate Tool','']],
   [['shaper','Shaper Tool','Shift+N'],['pencil','Pencil Tool','N']],[['eraser','Eraser Tool','E']],
   [['rotate','Rotate Tool','Shift+R'],['reflect','Reflect Tool','']],[['scale','Scale Tool','S']],
   [['shapebuilder','Shape Builder Tool','Shift+M']],[['level','Energy Level Tool — E_c, E_v, E_F…','Shift+L']],
